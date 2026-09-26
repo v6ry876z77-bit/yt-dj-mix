@@ -630,7 +630,6 @@ async function checkClipboard(manual = false) {
   offerClip(id);
 }
 $('#btnClip').addEventListener('click', () => checkClipboard(true));
-$('#btnClip2').addEventListener('click', () => checkClipboard(true));
 let clipCheckAt = 0;
 function autoClip() {
   if (!started || document.visibilityState !== 'visible') return;

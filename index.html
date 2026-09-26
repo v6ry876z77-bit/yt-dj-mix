@@ -37,15 +37,9 @@ body.smallvid .vid{width:min(100%,356px);align-self:center}
 .cc>button{padding:5px 6px;font-size:13px}
 /* デッキB を小さく表示（動画は YouTube の最小サイズ 356×200 を確保） */
 @media (min-width:761px){
-  body.bmini main{grid-template-columns:minmax(0,1fr) 372px;grid-template-areas:"a b" "a m";grid-template-rows:auto 1fr;align-items:start}
-  body.bmini .deck[data-deck=A]{grid-area:a}
-  body.bmini .deck[data-deck=B]{grid-area:b}
-  body.bmini .mixer{grid-area:m}
+  body.bmini main{grid-template-columns:minmax(0,1fr) minmax(190px,220px) 372px;align-items:start}
   body.bmini .deck[data-deck=A] .vid{width:min(100%,calc((100vh - 400px) * 16 / 9));align-self:center}
   body.bmini .deck[data-deck=A] .hint{display:none}
-  body.bmini .mixer .vols input{height:90px}
-  body.bmini .mixer .paste{display:none}
-  body.bmini .hist{max-height:max(120px,calc(100vh - 640px))}
 }
 body.bmini .deck[data-deck=B] .pads,body.bmini .deck[data-deck=B] .loops,body.bmini .deck[data-deck=B] .cc{display:none}
 body.bmini .deck[data-deck=B]{padding:6px;gap:5px;font-size:13px}
@@ -155,7 +149,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
       <div class="row"><button data-load="A">A へ</button><button data-load="B">B へ</button><button id="btnAddHist">履歴へ</button></div>
       <span class="hint">YouTube で見つけた動画は「共有」→「YT DJ」、または「共有」→「コピー」してからこの画面に戻ると読み込めます。</span>
     </div>
-    <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="検索 または URL" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button><button type="button" id="btnClip2" style="flex:0 0 auto" title="クリップボードから貼り付け">📋</button></form>
+    <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="検索 または URL" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button></form>
     <div class="row seg"><button id="segS">検索結果</button><button id="segH" class="on">履歴</button></div>
     <ul id="srch" class="hist" hidden></ul>
     <ul id="hist" class="hist"></ul>
