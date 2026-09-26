@@ -3,7 +3,7 @@
   "short_name": "YT DJ",
   "start_url": "./",
   "scope": "./",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "landscape",
   "background_color": "#111318",
   "theme_color": "#111318",
