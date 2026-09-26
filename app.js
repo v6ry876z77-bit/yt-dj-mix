@@ -43,7 +43,7 @@ for (const t of TARGETS) {
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
-  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '' },
+  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false },
   decks: {},             // A: {videoId,title,cue,hc,pos}
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
@@ -116,7 +116,7 @@ class Deck {
   buildUI() {
     const n = this.name;
     this.el.innerHTML = `
-      <div class="vid"><div id="player${n}"></div></div>
+      <div class="vid"><div id="player${n}"></div><div class="shield"></div></div>
       <div class="dtitle"><span class="tag">${n}</span><span class="tt">未ロード</span></div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span><span class="rate">×1.00</span></div>
@@ -855,6 +855,12 @@ $('#startBtn').addEventListener('click', () => {
   }
   if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
 });
+function applyVideoSize() {
+  document.body.classList.toggle('smallvid', !!S.settings.smallVideo);
+  $('#btnVid').textContent = S.settings.smallVideo ? '🎬 動画: 小' : '🎬 動画: 大';
+}
+$('#btnVid').addEventListener('click', () => { S.settings.smallVideo = !S.settings.smallVideo; applyVideoSize(); save(); });
+applyVideoSize();
 $('#btnFull').addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen?.().catch(() => { });

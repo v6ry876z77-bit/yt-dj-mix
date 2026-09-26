@@ -29,6 +29,10 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(
 .deck[data-deck=A]{border-top:3px solid var(--a)} .deck[data-deck=B]{border-top:3px solid var(--b)}
 .vid{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
 .vid iframe,.vid>div{position:absolute;inset:0;width:100%;height:100%}
+.vid .shield{z-index:2;background:transparent;touch-action:manipulation}
+body.smallvid .vid{width:min(100%,356px);align-self:center}
+body.smallvid .transport button{padding:18px 6px}
+body.smallvid .pads button{padding:20px 4px}
 .dtitle{font-weight:600;min-height:1.3em}
 .dtitle .tag{display:inline-block;font-weight:800;margin-right:6px}
 .deck[data-deck=A] .tag{color:var(--a)} .deck[data-deck=B] .tag{color:var(--b)}
@@ -107,6 +111,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
   <h1>YT DJ Mix</h1>
   <span><span id="midiDot" class="dot"></span><span id="midiName">MIDI 未接続</span></span>
   <button id="btnSettings">⚙ 設定・割り当て</button>
+  <button id="btnVid">🎬 動画: 大</button>
   <button id="btnFull">⛶ 全画面</button>
 </header>
 
