@@ -43,7 +43,7 @@ for (const t of TARGETS) {
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
-  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true },
+  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '' },
   decks: {},             // A: {videoId,title,cue,hc,pos}
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
@@ -375,8 +375,10 @@ function applyVolumes() { for (const d of decks) d.applyVolume(); }
 
 window.onYouTubeIframeAPIReady = () => { for (const d of decks) d.createPlayer(); };
 
-/* ---------- 履歴 ---------- */
+/* ---------- 履歴・検索結果（ブラウズつまみ／LOAD は表示中の一覧に対して動く） ---------- */
 let histSel = 0;
+let listMode = 'hist'; // 'hist' | 'srch'
+const srch = { q: '', items: [], next: null, sel: 0, busy: false };
 function addHistory(id, title) {
   const i = S.hist.findIndex(h => h.id === id);
   if (i >= 0) { if (title) S.hist[i].title = title; }
@@ -386,7 +388,7 @@ function addHistory(id, title) {
 }
 function renderHist() {
   const ul = $('#hist');
-  if (!S.hist.length) { ul.innerHTML = '<li class="hint">履歴はまだありません。URL を貼り付けるか、YouTube アプリの「共有」から送ってください。</li>'; return; }
+  if (!S.hist.length) { ul.innerHTML = '<li class="hint">履歴はまだありません。検索するか、URL を貼り付けるか、YouTube アプリの「共有」から送ってください。</li>'; return; }
   histSel = Math.max(0, Math.min(histSel, S.hist.length - 1));
   ul.innerHTML = S.hist.map((h, i) => `<li data-i="${i}" class="${i === histSel ? 'sel' : ''}">
     <span class="t"></span><button data-to="A">A</button><button data-to="B">B</button><button data-del>×</button></li>`).join('');
@@ -395,21 +397,123 @@ function renderHist() {
 $('#hist').addEventListener('click', e => {
   const li = e.target.closest('li[data-i]'); if (!li) return;
   const i = +li.dataset.i;
-  if (e.target.dataset.to) deckOf(e.target.dataset.to).load(S.hist[i].id);
+  if (e.target.dataset.to) loadInto(deckOf(e.target.dataset.to), S.hist[i]);
   else if (e.target.hasAttribute('data-del')) { S.hist.splice(i, 1); save(); }
   else histSel = i;
   renderHist();
 });
+function renderSrch() {
+  const ul = $('#srch');
+  if (srch.busy && !srch.items.length) { ul.innerHTML = '<li class="hint">検索中…</li>'; return; }
+  if (!srch.items.length) { ul.innerHTML = `<li class="hint">${srch.q ? '見つかりませんでした' : '上の欄にキーワードを入れて検索してください'}</li>`; return; }
+  srch.sel = Math.max(0, Math.min(srch.sel, srch.items.length - 1));
+  ul.innerHTML = srch.items.map((v, i) => `<li data-i="${i}" class="${i === srch.sel ? 'sel' : ''}">
+    <img loading="lazy" alt=""><span class="t"><span class="tt"></span><span class="sub"></span></span><button data-to="A">A</button><button data-to="B">B</button></li>`).join('')
+    + (srch.next ? `<li class="more"><button data-more>${srch.busy ? '読み込み中…' : 'もっと見る'}</button></li>` : '');
+  $$('li[data-i]', ul).forEach((li, i) => {
+    const v = srch.items[i];
+    $('img', li).src = v.thumb; $('.tt', li).textContent = v.title;
+    $('.sub', li).textContent = [v.dur, v.ch].filter(Boolean).join(' ・ ');
+  });
+}
+$('#srch').addEventListener('click', e => {
+  if (e.target.hasAttribute('data-more')) { runSearch(true); return; }
+  const li = e.target.closest('li[data-i]'); if (!li) return;
+  const i = +li.dataset.i;
+  if (e.target.dataset.to) loadInto(deckOf(e.target.dataset.to), srch.items[i]);
+  srch.sel = i; renderSrch();
+});
+function setListMode(m) {
+  listMode = m;
+  $('#srch').hidden = m !== 'srch'; $('#hist').hidden = m !== 'hist';
+  $('#segS').classList.toggle('on', m === 'srch'); $('#segH').classList.toggle('on', m === 'hist');
+}
+$('#segS').addEventListener('click', () => { setListMode('srch'); renderSrch(); });
+$('#segH').addEventListener('click', () => setListMode('hist'));
+
+const decodeHtml = s => { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; };
+function isoDur(s) {
+  const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(s || ''); if (!m) return '';
+  const h = +(m[1] || 0), mi = +(m[2] || 0), se = +(m[3] || 0);
+  return h ? `${h}:${String(mi).padStart(2, '0')}:${String(se).padStart(2, '0')}` : `${mi}:${String(se).padStart(2, '0')}`;
+}
+async function ytApi(path, params) {
+  const u = new URL(`https://www.googleapis.com/youtube/v3/${path}`);
+  for (const [k, v] of Object.entries({ ...params, key: S.settings.ytKey })) u.searchParams.set(k, v);
+  let r;
+  try { r = await fetch(u); } catch (e) { throw new Error('通信できませんでした（ネット接続を確認してください）'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const reason = j.error?.errors?.[0]?.reason || j.error?.status || String(r.status);
+    const msg = {
+      quotaExceeded: '今日の検索回数の上限に達しました（日本時間の午後4〜5時ごろにリセット）',
+      keyInvalid: 'API キーが正しくありません（設定を確認してください）',
+      badRequest: 'API キーが正しくありません（設定を確認してください）',
+      INVALID_ARGUMENT: 'API キーが正しくありません（設定を確認してください）',
+      accessNotConfigured: 'YouTube Data API v3 が有効になっていません',
+      SERVICE_DISABLED: 'YouTube Data API v3 が有効になっていません',
+      forbidden: 'このサイトからのキーの使用が許可されていません（キーの制限を確認してください）',
+      PERMISSION_DENIED: 'このサイトからのキーの使用が許可されていません（キーの制限を確認してください）',
+    }[reason] || `検索エラー（${reason}）`;
+    throw new Error(msg);
+  }
+  return j;
+}
+async function runSearch(more = false) {
+  if (srch.busy) return;
+  if (!more) {
+    const q = $('#qIn').value.trim(); if (!q) return;
+    // URL が入力されたら検索せずに履歴へ入れる
+    const id = parseYouTubeId(q);
+    if (id && /youtu|^[\w-]{11}$/.test(q)) { addHistory(id, ''); histSel = 0; setListMode('hist'); renderHist(); toast('履歴に追加しました'); $('#qIn').value = ''; return; }
+    if (!S.settings.ytKey) { toast('検索するには「⚙ 設定・割り当て」で YouTube API キーを登録してください', 4000); return; }
+    Object.assign(srch, { q, items: [], next: null, sel: 0 });
+  }
+  srch.busy = true; setListMode('srch'); renderSrch();
+  try {
+    const p = { part: 'snippet', type: 'video', videoEmbeddable: 'true', maxResults: '25', q: srch.q, regionCode: 'JP', relevanceLanguage: 'ja' };
+    if (more && srch.next) p.pageToken = srch.next;
+    const r = await ytApi('search', p);
+    const items = (r.items || []).filter(x => x.id?.videoId).map(x => ({
+      id: x.id.videoId, title: decodeHtml(x.snippet.title), ch: decodeHtml(x.snippet.channelTitle || ''),
+      thumb: x.snippet.thumbnails?.medium?.url || x.snippet.thumbnails?.default?.url || '', dur: '',
+    }));
+    if (items.length) { // 長さは別 API で取得（消費はごくわずか）
+      try {
+        const d = await ytApi('videos', { part: 'contentDetails', id: items.map(v => v.id).join(',') });
+        const m = Object.fromEntries((d.items || []).map(v => [v.id, isoDur(v.contentDetails?.duration)]));
+        items.forEach(v => v.dur = m[v.id] || '');
+      } catch (e) { }
+    }
+    srch.items.push(...items); srch.next = r.nextPageToken || null;
+  } catch (e) { toast(e.message, 5000); }
+  srch.busy = false; renderSrch();
+}
+$('#searchForm').addEventListener('submit', e => { e.preventDefault(); $('#qIn').blur(); runSearch(); });
+
+function loadInto(deck, item) {
+  if (!item) return;
+  addHistory(item.id, item.title || '');
+  deck.load(item.id);
+}
 function browse(delta) {
+  const dir = delta > 0 ? 1 : -1;
+  if (listMode === 'srch') {
+    if (!srch.items.length) return;
+    srch.sel = Math.max(0, Math.min(srch.items.length - 1, srch.sel + dir)); renderSrch();
+    const li = $(`#srch li[data-i="${srch.sel}"]`); if (li) li.scrollIntoView({ block: 'nearest' });
+    return;
+  }
   if (!S.hist.length) return;
-  histSel = Math.max(0, Math.min(S.hist.length - 1, histSel + delta));
+  histSel = Math.max(0, Math.min(S.hist.length - 1, histSel + dir));
   renderHist();
   const li = $(`#hist li[data-i="${histSel}"]`); if (li) li.scrollIntoView({ block: 'nearest' });
 }
 function loadSelected(deck) {
-  const h = S.hist[histSel]; if (!h) { toast('履歴が空です'); return; }
+  const item = listMode === 'srch' ? srch.items[srch.sel] : S.hist[histSel];
+  if (!item) { toast(listMode === 'srch' ? '検索結果がありません' : '履歴が空です'); return; }
   if (deck.playing) { toast(`デッキ${deck.name} は再生中なので読み込みません（止めてから LOAD）`, 3000); return; }
-  deck.load(h.id);
+  loadInto(deck, item);
 }
 
 /* ---------- URL 貼り付け・共有 ---------- */
@@ -505,7 +609,7 @@ function dispatch(b, val) {
   } else {
     const d = b.rel === 'offset' ? val - 64 : (val < 64 ? val : val - 128);
     if (act === 'jog') deck.jog(d);
-    else if (act === 'browse') browse(d > 0 ? 1 : -1);
+    else if (act === 'browse') browse(d);
   }
 }
 
@@ -598,6 +702,7 @@ function openSettings() {
   $('#optInvert').checked = S.settings.pitchInvert;
   $('#optJog').value = S.settings.jogSens;
   $('#optLed').checked = S.settings.led;
+  $('#optKey').value = S.settings.ytKey || '';
   $('#monitor').textContent = monitorLines.join('\n') || '（コントローラーを操作するとここに表示されます）';
   renderMapTable(); $('#settings').showModal();
 }
@@ -608,10 +713,11 @@ $('#optRange').addEventListener('change', e => { S.settings.pitchRange = +e.targ
 $('#optInvert').addEventListener('change', e => { S.settings.pitchInvert = e.target.checked; save(); });
 $('#optJog').addEventListener('change', e => { const v = +e.target.value; if (v > 0) { S.settings.jogSens = v; save(); } });
 $('#optLed').addEventListener('change', e => { S.settings.led = e.target.checked; save(); refreshLeds(); });
+$('#optKey').addEventListener('change', e => { S.settings.ytKey = e.target.value.trim(); save(); if (S.settings.ytKey) toast('API キーを保存しました'); });
 $('#btnReconnect').addEventListener('click', initMidi);
 $('#btnClearMap').addEventListener('click', () => { if (confirm('割り当てをすべて消去しますか？')) { S.map = {}; save(); renderMapTable(); } });
 $('#btnExport').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify({ map: S.map, settings: S.settings }, null, 1)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ map: S.map, settings: { ...S.settings, ytKey: undefined } }, null, 1)], { type: 'application/json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ytdj-mapping.json'; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 });
@@ -620,7 +726,7 @@ $('#fileImport').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
   try {
     const o = JSON.parse(await f.text());
-    if (o.map) S.map = o.map; if (o.settings) Object.assign(S.settings, o.settings);
+    if (o.map) S.map = o.map; if (o.settings) { delete o.settings.ytKey; Object.assign(S.settings, o.settings); }
     save(); openSettings(); toast('読み込みました');
   } catch (err) { toast('ファイルを読めませんでした'); }
   e.target.value = '';
@@ -682,6 +788,6 @@ setInterval(() => { const t = performance.now(); for (const d of decks) d.tick(t
 setInterval(() => { for (const d of decks) d.renderLive(); }, 100);
 setInterval(save, 3000);
 
-renderHist();
+renderHist(); renderSrch();
 decks.forEach(d => d.setPitch(0));
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });

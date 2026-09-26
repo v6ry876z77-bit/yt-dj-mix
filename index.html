@@ -63,6 +63,11 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(
 .hist li.sel{background:#2d3b52}
 .hist li .t{flex:1;min-width:0;font-size:13px}
 .hist li button{padding:4px 8px;font-size:13px}
+.hist li img{width:64px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;flex:0 0 auto;background:#000}
+.hist li .sub{display:block;color:var(--dim);font-size:11px}
+.hist li.more{justify-content:center}
+.seg>button{padding:6px}
+.seg>button.on{background:#2d3b52;border-color:var(--a);color:var(--text)}
 .hint{color:var(--dim);font-size:12px}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:560px;width:100%}
@@ -118,6 +123,9 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
       <div class="row"><button data-load="A">A へ</button><button data-load="B">B へ</button><button id="btnAddHist">履歴へ</button></div>
       <a class="hint" href="https://www.youtube.com/" target="_blank" rel="noopener">YouTube で探す →「共有」でこのアプリを選ぶと履歴に入ります</a>
     </div>
+    <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="YouTube を検索" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button></form>
+    <div class="row seg"><button id="segS">検索結果</button><button id="segH" class="on">履歴</button></div>
+    <ul id="srch" class="hist" hidden></ul>
     <ul id="hist" class="hist"></ul>
   </section>
   <section class="deck" data-deck="B"></section>
@@ -136,6 +144,8 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
       <label><input type="checkbox" id="optInvert"> ピッチフェーダーの向きを反転</label>
       <label>ジョグ感度 <input type="number" id="optJog" min="0.002" max="0.5" step="0.005" style="width:6em"> 秒/目盛</label>
       <label><input type="checkbox" id="optLed"> コントローラーのランプを点灯させる</label>
+      <label style="grid-column:1/-1">YouTube API キー（検索用） <input id="optKey" type="password" autocomplete="off" spellcheck="false" style="flex:1" placeholder="AIza…"></label>
+      <span class="hint" style="grid-column:1/-1">キーはこの端末の中だけに保存されます。1日あたり約100回まで検索できます。</span>
     </div>
     <h3>MIDI モニター（最後に受信した信号）</h3>
     <pre id="monitor">（コントローラーを操作するとここに表示されます）</pre>
