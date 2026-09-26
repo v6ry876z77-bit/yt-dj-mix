@@ -43,7 +43,7 @@ for (const t of TARGETS) {
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
-  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false },
+  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false, cc: { A: false, B: false }, ccSize: 3 },
   decks: {},             // A: {videoId,title,cue,hc,pos}
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
@@ -51,7 +51,7 @@ const defaults = () => ({
 let S = defaults();
 try {
   const raw = localStorage.getItem(STORE_KEY);
-  if (raw) { const o = JSON.parse(raw); S = Object.assign(defaults(), o); S.settings = Object.assign(defaults().settings, o.settings || {}); }
+  if (raw) { const o = JSON.parse(raw); S = Object.assign(defaults(), o); S.settings = Object.assign(defaults().settings, o.settings || {}); S.settings.cc = Object.assign({ A: false, B: false }, S.settings.cc); }
 } catch (e) { /* 保存領域が使えなくても動作は続ける */ }
 let saveTimer = null;
 function save() {
@@ -116,7 +116,7 @@ class Deck {
   buildUI() {
     const n = this.name;
     this.el.innerHTML = `
-      <div class="vid"><div id="player${n}"></div><div class="shield"></div></div>
+      <div class="vid"><div id="player${n}"></div><div class="shield"></div><button class="unbig" data-a="big">✕ 元に戻す</button></div>
       <div class="dtitle"><span class="tag">${n}</span><span class="tt">未ロード</span></div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span><span class="rate">×1.00</span></div>
@@ -126,6 +126,7 @@ class Deck {
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
       <div class="row"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
+      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button><button data-a="big">⛶ 大画面</button></div>
       <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span><button data-a="pitchReset" style="padding:4px 8px">0</button></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
     this.ui = {
@@ -133,7 +134,7 @@ class Deck {
       marks: $('.marks', this.el), loopz: $('.loopz', this.el), cur: $('.cur', this.el), dur: $('.dur', this.el),
       remain: $('.remain', this.el), snd: $('.snd', this.el), rate: $('.rate', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
-      pads: $$('[data-hc]', this.el),
+      pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el),
     };
     // ボタン（CUE は押している間だけプレビューするので pointerdown/up を使う）
     for (const b of $$('[data-a]', this.el)) {
@@ -142,6 +143,8 @@ class Deck {
         b.addEventListener('pointerdown', e => { e.preventDefault(); this.cueDown(); });
         b.addEventListener('pointerup', () => this.cueUp());
         b.addEventListener('pointercancel', () => this.cueUp());
+      } else if (a === 'cc' || a === 'ccMinus' || a === 'ccPlus' || a === 'big') {
+        b.addEventListener('click', () => this.view(a));
       } else if (a === 'pitchReset') {
         b.addEventListener('click', () => this.setPitch(0));
       } else {
@@ -166,7 +169,7 @@ class Deck {
   }
   /* --- YouTube --- */
   createPlayer() {
-    const pv = { playsinline: 1, controls: 0, disablekb: 1, rel: 0, iv_load_policy: 3, fs: 0 };
+    const pv = { playsinline: 1, controls: 0, disablekb: 1, rel: 0, iv_load_policy: 3, fs: 0, hl: 'ja', cc_lang_pref: 'ja' };
     if (location.origin && location.origin !== 'null') pv.origin = location.origin;
     this.player = new YT.Player(`player${this.name}`, {
       width: '100%', height: '100%', playerVars: pv,
@@ -211,6 +214,7 @@ class Deck {
       if (vd && vd.title && vd.title !== this.title) { this.title = vd.title; addHistory(this.videoId, this.title); this.renderStatic(); save(); }
     }
     if (s === YT.PlayerState.PLAYING) this.appliedRate = null; // 再生開始時にテンポを確実に反映
+    if (s === YT.PlayerState.PLAYING && S.settings.cc[this.name] && this.ccFor !== this.videoId) this.applyCaptions();
     refreshLeds();
   }
   onError(code) {
@@ -294,6 +298,37 @@ class Deck {
     if (this.hc[i] == null) return;
     this.hc[i] = null; toast(`パッド${i + 1} を消去`, 1200); this.renderStatic(); refreshLeds(); save();
   }
+  /* --- 字幕（YouTube プレーヤーの字幕を大きく表示） --- */
+  view(a) {
+    const cc = S.settings.cc;
+    if (a === 'big') {
+      const on = !this.ui.vid.classList.contains('big');
+      for (const d of decks) d.ui.vid.classList.remove('big');
+      this.ui.vid.classList.toggle('big', on);
+    } else if (a === 'cc') {
+      cc[this.name] = !cc[this.name];
+      if (cc[this.name]) this.applyCaptions(); else { this.ccFor = null; try { this.player.unloadModule('captions'); } catch (e) { } }
+    } else {
+      S.settings.ccSize = Math.max(-1, Math.min(4, S.settings.ccSize + (a === 'ccPlus' ? 1 : -1)));
+      for (const d of decks) if (cc[d.name]) d.setCaptionSize();
+      toast(`字幕の大きさ: ${S.settings.ccSize + 2} / 6`, 1200);
+    }
+    this.renderCc(); save();
+  }
+  applyCaptions() {
+    if (!this.ready || !this.videoId) return;
+    this.ccFor = this.videoId;
+    try { this.player.loadModule('captions'); } catch (e) { }
+    // 言語はプレーヤー作成時の cc_lang_pref（日本語優先）で決まる。字幕の読み込みを待ってから大きさを反映
+    setTimeout(() => {
+      try {
+        if (!(this.player.getOption('captions', 'tracklist') || []).length) toast(`デッキ${this.name}: この動画には字幕がありません`, 2000);
+      } catch (e) { }
+      this.setCaptionSize();
+    }, 1500);
+  }
+  setCaptionSize() { try { this.player.setOption('captions', 'fontSize', S.settings.ccSize); } catch (e) { } }
+  renderCc() { this.ui.ccBtn.classList.toggle('on', !!S.settings.cc[this.name]); }
   setPitch(p, fromUi = false) {
     if (Math.abs(p) < 0.02) p = 0; // 中央付近は 0 に吸着
     this.pitch = p;
@@ -871,6 +906,8 @@ setInterval(() => { const t = performance.now(); for (const d of decks) d.tick(t
 setInterval(() => { for (const d of decks) d.renderLive(); }, 100);
 setInterval(save, 3000);
 
+document.addEventListener('keydown', e => { if (e.key === 'Escape') for (const d of decks) d.ui.vid.classList.remove('big'); });
 renderHist(); renderSrch(); updateSearchPlaceholder();
+decks.forEach(d => d.renderCc());
 decks.forEach(d => d.setPitch(0));
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
