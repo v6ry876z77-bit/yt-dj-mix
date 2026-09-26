@@ -87,6 +87,9 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 .opts label{display:flex;gap:8px;align-items:center}
 #wizStep{font-size:22px;font-weight:800}
 #wizInfo{min-height:1.4em;color:var(--ok)}
+#clipBar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--panel);border:2px solid var(--ok);padding:10px 12px;border-radius:12px;z-index:55;display:none;width:min(560px,calc(100vw - 32px));box-shadow:0 6px 24px rgba(0,0,0,.6)}
+#clipBar .ct{font-weight:600;margin-bottom:8px}
+#clipBar .row>button{min-width:64px}
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000;border:1px solid var(--line);padding:10px 16px;border-radius:10px;z-index:60;display:none;max-width:calc(100vw - 32px)}
 </style>
 </head>
@@ -121,7 +124,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
     <div class="paste">
       <div class="row"><input id="urlIn" placeholder="URL を貼り付け" style="flex:1"><button id="btnClip" title="クリップボードから貼り付け">📋</button></div>
       <div class="row"><button data-load="A">A へ</button><button data-load="B">B へ</button><button id="btnAddHist">履歴へ</button></div>
-      <a class="hint" href="https://www.youtube.com/" target="_blank" rel="noopener">YouTube で探す →「共有」でこのアプリを選ぶと履歴に入ります</a>
+      <span class="hint">YouTube で見つけた動画は「共有」→「YT DJ」、または「共有」→「コピー」してからこの画面に戻ると読み込めます。</span>
     </div>
     <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="YouTube を検索" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button></form>
     <div class="row seg"><button id="segS">検索結果</button><button id="segH" class="on">履歴</button></div>
@@ -171,6 +174,8 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
   </div>
 </dialog>
 
+<div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
+  <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
 <script src="app.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>

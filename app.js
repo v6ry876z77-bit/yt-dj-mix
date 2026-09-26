@@ -379,10 +379,25 @@ window.onYouTubeIframeAPIReady = () => { for (const d of decks) d.createPlayer()
 let histSel = 0;
 let listMode = 'hist'; // 'hist' | 'srch'
 const srch = { q: '', items: [], next: null, sel: 0, busy: false };
+const titleReq = new Set();
+async function fetchTitle(id) {
+  if (titleReq.has(id)) return; titleReq.add(id);
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + id)}`);
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j.title) {
+      addHistory(id, j.title);
+      for (const d of decks) if (d.videoId === id && !d.title) { d.title = j.title; d.renderStatic(); }
+      if (clipOffer && clipOffer.id === id) $('#clipBar .ct').textContent = j.title;
+    }
+  } catch (e) { }
+}
 function addHistory(id, title) {
   const i = S.hist.findIndex(h => h.id === id);
   if (i >= 0) { if (title) S.hist[i].title = title; }
   else S.hist.unshift({ id, title: title || '' });
+  if (!title && !(i >= 0 && S.hist[i].title)) fetchTitle(id);
   if (S.hist.length > 200) S.hist.length = 200;
   renderHist(); save();
 }
@@ -466,7 +481,7 @@ async function runSearch(more = false) {
     // URL が入力されたら検索せずに履歴へ入れる
     const id = parseYouTubeId(q);
     if (id && /youtu|^[\w-]{11}$/.test(q)) { addHistory(id, ''); histSel = 0; setListMode('hist'); renderHist(); toast('履歴に追加しました'); $('#qIn').value = ''; return; }
-    if (!S.settings.ytKey) { toast('検索するには「⚙ 設定・割り当て」で YouTube API キーを登録してください', 4000); return; }
+    if (!S.settings.ytKey) { openYouTubeSearch(q); return; }
     Object.assign(srch, { q, items: [], next: null, sel: 0 });
   }
   srch.busy = true; setListMode('srch'); renderSrch();
@@ -488,6 +503,19 @@ async function runSearch(more = false) {
     srch.items.push(...items); srch.next = r.nextPageToken || null;
   } catch (e) { toast(e.message, 5000); }
   srch.busy = false; renderSrch();
+}
+function openYouTubeSearch(q) {
+  const path = `www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+  const a = document.createElement('a');
+  if (/Android/i.test(navigator.userAgent)) {
+    // YouTube アプリで開く（入っていなければブラウザで開く）
+    a.href = `intent://${path}#Intent;scheme=https;package=com.google.android.youtube;S.browser_fallback_url=${encodeURIComponent('https://' + path)};end`;
+  } else { a.href = `https://${path}`; a.target = '_blank'; a.rel = 'noopener'; }
+  a.click();
+  toast('気に入った動画は「共有」→「YT DJ」か、「共有」→「コピー」してから戻ってきてください', 5000);
+}
+function updateSearchPlaceholder() {
+  $('#qIn').placeholder = S.settings.ytKey ? 'YouTube を検索' : 'YouTube アプリで検索';
 }
 $('#searchForm').addEventListener('submit', e => { e.preventDefault(); $('#qIn').blur(); runSearch(); });
 
@@ -524,10 +552,45 @@ function takeUrlInput() {
 }
 $$('[data-load]').forEach(b => b.addEventListener('click', () => { const id = takeUrlInput(); if (id) deckOf(b.dataset.load).load(id); }));
 $('#btnAddHist').addEventListener('click', () => { const id = takeUrlInput(); if (id) { addHistory(id, ''); histSel = 0; renderHist(); toast('履歴に追加しました'); } });
-$('#btnClip').addEventListener('click', async () => {
-  try { $('#urlIn').value = await navigator.clipboard.readText(); }
-  catch (e) { toast('クリップボードを読めませんでした。入力欄を長押しして貼り付けてください'); }
+let clipOffer = null;
+function offerClip(id) {
+  clipOffer = { id };
+  const h = S.hist.find(x => x.id === id);
+  $('#clipBar .ct').textContent = (h && h.title) || id;
+  $('#clipBar').style.display = 'block';
+  if (!(h && h.title)) fetchTitle(id);
+}
+function closeClip() { clipOffer = null; $('#clipBar').style.display = 'none'; }
+$('#clipBar').addEventListener('click', e => {
+  const k = e.target.dataset.clip; if (!k || !clipOffer) return;
+  const id = clipOffer.id; closeClip();
+  if (k === 'A' || k === 'B') {
+    const d = deckOf(k);
+    if (d.playing && !confirm(`デッキ${k} は再生中です。入れ替えますか？`)) { addHistory(id, ''); return; }
+    loadInto(d, { id, title: '' });
+  } else if (k === 'hist') { addHistory(id, ''); histSel = 0; setListMode('hist'); renderHist(); toast('履歴に追加しました'); }
 });
+// 画面に戻ってきた時にクリップボードを確認（新しい YouTube リンクがあれば提案）
+async function checkClipboard(manual = false) {
+  if (!navigator.clipboard?.readText) { if (manual) toast('この端末ではクリップボードを読めません。入力欄を長押しして貼り付けてください'); return; }
+  let text;
+  try { text = await navigator.clipboard.readText(); }
+  catch (e) { if (manual) toast('クリップボードを読めませんでした。入力欄を長押しして貼り付けてください'); return; }
+  const id = parseYouTubeId(text);
+  if (!id || !/youtu/.test(text)) { if (manual) { if (text) $('#urlIn').value = text; else toast('クリップボードは空です'); } return; }
+  if (!manual && id === S.lastClip) return; // 同じリンクは何度も聞かない
+  S.lastClip = id; save();
+  offerClip(id);
+}
+$('#btnClip').addEventListener('click', () => checkClipboard(true));
+let clipCheckAt = 0;
+function autoClip() {
+  if (!started || document.visibilityState !== 'visible') return;
+  const t = Date.now(); if (t - clipCheckAt < 800) return; clipCheckAt = t;
+  setTimeout(() => checkClipboard(false), 300);
+}
+document.addEventListener('visibilitychange', autoClip);
+window.addEventListener('focus', autoClip);
 function handleShared(params) {
   const text = [params.get('url'), params.get('text'), params.get('title')].filter(Boolean).join(' ');
   const id = parseYouTubeId(text); if (!id) return false;
@@ -713,7 +776,7 @@ $('#optRange').addEventListener('change', e => { S.settings.pitchRange = +e.targ
 $('#optInvert').addEventListener('change', e => { S.settings.pitchInvert = e.target.checked; save(); });
 $('#optJog').addEventListener('change', e => { const v = +e.target.value; if (v > 0) { S.settings.jogSens = v; save(); } });
 $('#optLed').addEventListener('change', e => { S.settings.led = e.target.checked; save(); refreshLeds(); });
-$('#optKey').addEventListener('change', e => { S.settings.ytKey = e.target.value.trim(); save(); if (S.settings.ytKey) toast('API キーを保存しました'); });
+$('#optKey').addEventListener('change', e => { S.settings.ytKey = e.target.value.trim(); save(); if (S.settings.ytKey) toast('API キーを保存しました'); updateSearchPlaceholder(); });
 $('#btnReconnect').addEventListener('click', initMidi);
 $('#btnClearMap').addEventListener('click', () => { if (confirm('割り当てをすべて消去しますか？')) { S.map = {}; save(); renderMapTable(); } });
 $('#btnExport').addEventListener('click', () => {
@@ -765,12 +828,14 @@ $('#wizard').addEventListener('cancel', () => wizEnd(false));
 
 /* ---------- 開始・画面 ---------- */
 let wakeLock = null;
+let started = false;
 async function keepAwake() {
   try { if ('wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { }
 }
 document.addEventListener('visibilitychange', keepAwake);
 $('#startBtn').addEventListener('click', () => {
   $('#start').style.display = 'none';
+  started = true;
   initMidi(); keepAwake();
   // 開始タップ前に読み込んだ曲は、タップ後に改めて準備し直す
   for (const d of decks) {
@@ -788,6 +853,6 @@ setInterval(() => { const t = performance.now(); for (const d of decks) d.tick(t
 setInterval(() => { for (const d of decks) d.renderLive(); }, 100);
 setInterval(save, 3000);
 
-renderHist(); renderSrch();
+renderHist(); renderSrch(); updateSearchPlaceholder();
 decks.forEach(d => d.setPitch(0));
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
