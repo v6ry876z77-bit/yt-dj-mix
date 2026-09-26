@@ -314,6 +314,12 @@ class Deck {
   tick(t) {
     if (!this.ready || !this.videoId) return;
     // 取りこぼし対策: 準備中のまま止まったら解除
+    // 自動再生が許可されず準備が進まない場合は、通常の読み込み（サムネイル表示）に切り替える
+    if (this.priming && t - this.primeStarted > 6000 && this.player.getPlayerState() === YT.PlayerState.UNSTARTED) {
+      this.priming = false; this.player.unMute(); this.applyVolume(true);
+      this.player.cueVideoById({ videoId: this.videoId, startSeconds: this.primeAt });
+      this.base = this.primeAt; return;
+    }
     if (this.priming && t - this.primeStarted > 15000) { this.priming = false; this.player.unMute(); this.applyVolume(true); }
     const cur = this.now();
     if (this.loop.on && this.loop.out != null && this.playing && cur >= this.loop.out) this.seek(this.loop.in);
@@ -660,6 +666,10 @@ document.addEventListener('visibilitychange', keepAwake);
 $('#startBtn').addEventListener('click', () => {
   $('#start').style.display = 'none';
   initMidi(); keepAwake();
+  // 開始タップ前に読み込んだ曲は、タップ後に改めて準備し直す
+  for (const d of decks) {
+    if (d.ready && d.videoId && (d.priming || d.state === YT.PlayerState.UNSTARTED || d.state === YT.PlayerState.CUED)) d.load(d.videoId, d.priming ? d.primeAt : d.now(), true);
+  }
   if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
 });
 $('#btnFull').addEventListener('click', () => {
