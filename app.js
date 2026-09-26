@@ -43,7 +43,7 @@ for (const t of TARGETS) {
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
-  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false, bNormal: false, cc: { A: false, B: false }, ccSize: 3 },
+  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false, bMode: 'hide', cc: { A: false, B: false }, ccSize: 3 },
   decks: {},             // A: {videoId,title,cue,hc,pos}
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
@@ -51,7 +51,8 @@ const defaults = () => ({
 let S = defaults();
 try {
   const raw = localStorage.getItem(STORE_KEY);
-  if (raw) { const o = JSON.parse(raw); S = Object.assign(defaults(), o); S.settings = Object.assign(defaults().settings, o.settings || {}); S.settings.cc = Object.assign({ A: false, B: false }, S.settings.cc); }
+  if (raw) { const o = JSON.parse(raw); S = Object.assign(defaults(), o); S.settings = Object.assign(defaults().settings, o.settings || {}); S.settings.cc = Object.assign({ A: false, B: false }, S.settings.cc);
+    if (o.settings && o.settings.bNormal) S.settings.bMode = 'normal'; delete S.settings.bNormal; }
 } catch (e) { /* 保存領域が使えなくても動作は続ける */ }
 let saveTimer = null;
 function save() {
@@ -125,8 +126,8 @@ class Deck {
         <button data-a="back">−10秒</button><button data-a="fwd">+10秒</button>
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
-      <div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
-      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button><button data-a="big">⛶ 大画面</button></div>
+      <div class="lc"><div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
+      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button><button data-a="big">⛶ 大画面</button></div></div>
       <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span><button data-a="pitchReset" style="padding:4px 8px">0</button></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
     this.ui = {
@@ -745,7 +746,10 @@ function refreshLeds() {
 }
 let lastPlaying = {};
 setInterval(() => { // 再生状態が変わった時だけランプ更新
-  for (const d of decks) if (lastPlaying[d.name] !== d.playing) { lastPlaying[d.name] = d.playing; refreshLeds(); }
+  for (const d of decks) if (lastPlaying[d.name] !== d.playing) {
+    lastPlaying[d.name] = d.playing; refreshLeds();
+    if (d.name === 'B' && S.settings.bMode === 'hide') { applyVideoSize(); if (d.playing) toast('デッキB が再生中なので表示しました', 2000); }
+  }
 }, 200);
 
 /* --- 学習 --- */
@@ -813,7 +817,7 @@ function openSettings() {
   $('#optJog').value = S.settings.jogSens;
   $('#optLed').checked = S.settings.led;
   $('#optKey').value = S.settings.ytKey || '';
-  $('#optBNormal').checked = !!S.settings.bNormal;
+  $('#optBMode').value = S.settings.bMode;
   $('#monitor').textContent = monitorLines.join('\n') || '（コントローラーを操作するとここに表示されます）';
   renderMapTable(); $('#settings').showModal();
 }
@@ -824,7 +828,7 @@ $('#optRange').addEventListener('change', e => { S.settings.pitchRange = +e.targ
 $('#optInvert').addEventListener('change', e => { S.settings.pitchInvert = e.target.checked; save(); });
 $('#optJog').addEventListener('change', e => { const v = +e.target.value; if (v > 0) { S.settings.jogSens = v; save(); } });
 $('#optLed').addEventListener('change', e => { S.settings.led = e.target.checked; save(); refreshLeds(); });
-$('#optBNormal').addEventListener('change', e => { S.settings.bNormal = e.target.checked; applyVideoSize(); save(); });
+$('#optBMode').addEventListener('change', e => { S.settings.bMode = e.target.value; applyVideoSize(); save(); });
 $('#optKey').addEventListener('change', e => { S.settings.ytKey = e.target.value.trim(); save(); if (S.settings.ytKey) toast('API キーを保存しました'); updateSearchPlaceholder(); });
 $('#btnReconnect').addEventListener('click', initMidi);
 $('#btnClearMap').addEventListener('click', () => { if (confirm('割り当てをすべて消去しますか？')) { S.map = {}; save(); renderMapTable(); } });
@@ -892,12 +896,21 @@ $('#startBtn').addEventListener('click', () => {
   }
   if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
 });
+const BMODE_LABEL = { hide: 'B: 隠す', mini: 'B: 小', normal: 'B: 通常' };
 function applyVideoSize() {
   document.body.classList.toggle('smallvid', !!S.settings.smallVideo);
-  document.body.classList.toggle('bmini', !S.settings.bNormal);
+  // 隠すモードでも B が再生中なら小さく表示する（見えないまま鳴らさない）
+  const m = S.settings.bMode === 'hide' && window.YT && deckOf('B').playing ? 'mini' : S.settings.bMode;
+  document.body.classList.toggle('bhide', m === 'hide');
+  document.body.classList.toggle('bmini', m === 'mini');
+  $('#btnBMode').textContent = BMODE_LABEL[S.settings.bMode] || BMODE_LABEL.hide;
   $('#btnVid').textContent = S.settings.smallVideo ? '🎬 動画: 小' : '🎬 動画: 大';
 }
 $('#btnVid').addEventListener('click', () => { S.settings.smallVideo = !S.settings.smallVideo; applyVideoSize(); save(); });
+$('#btnBMode').addEventListener('click', () => {
+  const order = ['hide', 'mini', 'normal'];
+  S.settings.bMode = order[(order.indexOf(S.settings.bMode) + 1) % order.length]; applyVideoSize(); save();
+});
 applyVideoSize();
 $('#btnFull').addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();

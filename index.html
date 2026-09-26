@@ -35,6 +35,18 @@ body.smallvid .vid{width:min(100%,356px);align-self:center}
 .vid .unbig{display:none;position:absolute;right:10px;top:10px;z-index:3;font-size:18px;padding:10px 16px;background:rgba(0,0,0,.7)}
 .vid.big .unbig{display:block}
 .cc>button{padding:5px 6px;font-size:13px}
+.lc{display:flex;flex-direction:column;gap:7px}
+.lc>.row{flex:1 1 0;min-width:0}
+/* デッキB を隠すモード: デッキA とミキサーだけにして動画を最大化 */
+body.bhide .deck[data-deck=B]{display:none}
+@media (min-width:761px){
+  body.bhide main{grid-template-columns:minmax(0,1fr) minmax(190px,230px);align-items:start}
+  body.bhide .deck[data-deck=A] .vid{width:min(100%,calc((100vh - 322px) * 16 / 9));align-self:center}
+  body.bhide .deck[data-deck=A] .lc{flex-direction:row}
+}
+body.bhide .deck[data-deck=A] .pads{grid-template-columns:repeat(8,minmax(0,1fr))}
+body.bhide .deck[data-deck=A] .dtitle{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.bhide .deck[data-deck=A] .hint{display:none}
 /* デッキB を小さく表示（動画は YouTube の最小サイズ 356×200 を確保） */
 @media (min-width:761px){
   body.bmini main{grid-template-columns:minmax(0,1fr) minmax(190px,220px) 372px;align-items:start}
@@ -129,6 +141,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
   <h1>YT DJ Mix</h1>
   <span><span id="midiDot" class="dot"></span><span id="midiName">MIDI 未接続</span></span>
   <button id="btnSettings">⚙ 設定・割り当て</button>
+  <button id="btnBMode">B: 隠す</button>
   <button id="btnVid">🎬 動画: 大</button>
   <button id="btnFull">⛶ 全画面</button>
 </header>
@@ -170,7 +183,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
       <label><input type="checkbox" id="optInvert"> ピッチフェーダーの向きを反転</label>
       <label>ジョグ感度 <input type="number" id="optJog" min="0.002" max="0.5" step="0.005" style="width:6em"> 秒/目盛</label>
       <label><input type="checkbox" id="optLed"> コントローラーのランプを点灯させる</label>
-      <label><input type="checkbox" id="optBNormal"> デッキB も大きく表示する</label>
+      <label>デッキB の表示 <select id="optBMode"><option value="hide">隠す（再生中だけ小さく表示）</option><option value="mini">小さく</option><option value="normal">通常</option></select></label>
       <label style="grid-column:1/-1">YouTube API キー（検索用） <input id="optKey" type="password" autocomplete="off" spellcheck="false" style="flex:1" placeholder="AIza…"></label>
       <span class="hint" style="grid-column:1/-1">キーはこの端末の中だけに保存されます。1日あたり約100回まで検索できます。</span>
     </div>
