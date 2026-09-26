@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<title>YT DJ Mix</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#111318; --panel:#1b1e25; --panel2:#242833; --line:#333948; --text:#e8eaf0; --dim:#9aa1b2;
+  --a:#3fa9ff; --b:#ff8a3d; --ok:#3ddc84; --warn:#ffcc00; --bad:#ff5566; --pad:#2b3040;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:15px;overflow-x:hidden;word-break:normal;overflow-wrap:anywhere;line-break:strict}
+button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+button:active{filter:brightness(1.4)}
+button.on{background:var(--ok);color:#000;border-color:var(--ok)}
+input,select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
+header{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:16px;margin:0;margin-right:auto}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--bad);margin-right:6px;vertical-align:middle}
+.dot.ok{background:var(--ok)}
+#midiName{color:var(--dim);font-size:13px}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(0,1fr);gap:10px;padding:10px}
+@media (max-width:760px){main{grid-template-columns:minmax(0,1fr)}}
+.deck{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.deck[data-deck=A]{border-top:3px solid var(--a)} .deck[data-deck=B]{border-top:3px solid var(--b)}
+.vid{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
+.vid iframe,.vid>div{position:absolute;inset:0;width:100%;height:100%}
+.dtitle{font-weight:600;min-height:1.3em}
+.dtitle .tag{display:inline-block;font-weight:800;margin-right:6px}
+.deck[data-deck=A] .tag{color:var(--a)} .deck[data-deck=B] .tag{color:var(--b)}
+.bar{position:relative;height:26px;background:var(--panel2);border-radius:6px;overflow:hidden;cursor:pointer;touch-action:none}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.18)}
+.bar .loopz{position:absolute;top:0;bottom:0;background:rgba(61,220,132,.3);display:none}
+.bar .mk{position:absolute;top:0;bottom:0;width:2px;background:var(--warn)}
+.bar .mk.hc{background:#c77dff;height:50%}
+.bar .ph{position:absolute;top:0;bottom:0;width:2px;background:#fff}
+.time{display:flex;gap:10px;color:var(--dim);font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.time .rate{margin-left:auto}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.row>button{flex:1 1 0;min-width:56px}
+.transport button{padding:12px 6px;font-weight:700}
+.pads{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.pads button{background:var(--pad);padding:12px 4px;font-weight:700}
+.pads button.set{background:#6b3fa0;border-color:#c77dff}
+.pitch{display:flex;align-items:center;gap:8px}
+.pitch input{flex:1}
+.pitch span{min-width:4.5em;text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
+.mixer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.vols{display:flex;justify-content:space-around;align-items:flex-end;gap:10px}
+.vols label{display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:700}
+.vols input{writing-mode:vertical-lr;direction:rtl;height:150px;width:34px}
+.xf{display:flex;flex-direction:column;gap:4px}
+.xf .lbl{display:flex;justify-content:space-between;font-weight:700}
+.xf input{width:100%}
+.paste{display:flex;flex-direction:column;gap:6px}
+.paste .row>button{min-width:44px}
+.hist{list-style:none;margin:0;padding:0;overflow-y:auto;max-height:340px;border:1px solid var(--line);border-radius:8px}
+.hist li{display:flex;gap:4px;align-items:center;padding:5px 6px;border-bottom:1px solid var(--line)}
+.hist li.sel{background:#2d3b52}
+.hist li .t{flex:1;min-width:0;font-size:13px}
+.hist li button{padding:4px 8px;font-size:13px}
+.hint{color:var(--dim);font-size:12px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:560px;width:100%}
+.card h2{margin-top:0}
+.big{font-size:20px;padding:14px 22px;background:var(--ok);color:#000;border:none;font-weight:800}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:0;width:min(900px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.7)}
+.dlg{padding:16px;display:flex;flex-direction:column;gap:12px}
+.dlg h3{margin:4px 0}
+.maptbl{width:100%;border-collapse:collapse;font-size:13px}
+.maptbl td{border-bottom:1px solid var(--line);padding:4px}
+.maptbl td:nth-child(2){color:var(--dim)}
+.maptbl button{padding:4px 8px;font-size:13px}
+.maptbl tr.learning{background:#4a3d10}
+pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160px;overflow-y:auto;white-space:pre-wrap;margin:0}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.opts label{display:flex;gap:8px;align-items:center}
+#wizStep{font-size:22px;font-weight:800}
+#wizInfo{min-height:1.4em;color:var(--ok)}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000;border:1px solid var(--line);padding:10px 16px;border-radius:10px;z-index:60;display:none;max-width:calc(100vw - 32px)}
+</style>
+</head>
+<body>
+<div id="start" class="overlay">
+  <div class="card">
+    <h2>YT DJ Mix</h2>
+    <p>YouTube を2デッキで再生し、Hercules DJControl Mix Ultra などの MIDI コントローラーで操作します。</p>
+    <p class="hint">コントローラーは USB-C（OTG）で接続するのが確実です。Bluetooth の場合は先に Android 側で BLE-MIDI 接続を済ませてください。</p>
+    <button id="startBtn" class="big">タップして開始</button>
+  </div>
+</div>
+
+<header>
+  <h1>YT DJ Mix</h1>
+  <span><span id="midiDot" class="dot"></span><span id="midiName">MIDI 未接続</span></span>
+  <button id="btnSettings">⚙ 設定・割り当て</button>
+  <button id="btnFull">⛶ 全画面</button>
+</header>
+
+<main>
+  <section class="deck" data-deck="A"></section>
+  <section class="mixer">
+    <div class="vols">
+      <label><span style="color:var(--a)">A</span><input type="range" id="volA" min="0" max="1000" value="1000"></label>
+      <label><span style="color:var(--b)">B</span><input type="range" id="volB" min="0" max="1000" value="1000"></label>
+    </div>
+    <div class="xf">
+      <div class="lbl"><span style="color:var(--a)">A</span><span>クロスフェーダー</span><span style="color:var(--b)">B</span></div>
+      <input type="range" id="xfader" min="0" max="1000" value="500">
+    </div>
+    <div class="paste">
+      <div class="row"><input id="urlIn" placeholder="URL を貼り付け" style="flex:1"><button id="btnClip" title="クリップボードから貼り付け">📋</button></div>
+      <div class="row"><button data-load="A">A へ</button><button data-load="B">B へ</button><button id="btnAddHist">履歴へ</button></div>
+      <a class="hint" href="https://www.youtube.com/" target="_blank" rel="noopener">YouTube で探す →「共有」でこのアプリを選ぶと履歴に入ります</a>
+    </div>
+    <ul id="hist" class="hist"></ul>
+  </section>
+  <section class="deck" data-deck="B"></section>
+</main>
+
+<dialog id="settings">
+  <div class="dlg">
+    <div class="row" style="align-items:center"><h3 style="flex:1">設定・コントローラー割り当て</h3><button id="btnCloseSettings" style="flex:0 0 auto">閉じる</button></div>
+    <div>
+      <div><b>MIDI:</b> <span id="midiList">-</span></div>
+      <div class="row" style="margin-top:6px"><button id="btnWizard">かんたん割り当て（順番に操作するだけ）</button><button id="btnReconnect">MIDI 再接続</button></div>
+    </div>
+    <div class="opts">
+      <label>ピッチ幅 <select id="optRange"><option value="0.25">±25%</option><option value="0.5">±50%</option><option value="1">±100%</option></select></label>
+      <span class="hint" style="grid-column:1/-1">※ YouTube の埋め込み再生はテンポを 0.25 刻み（0.75 / 1.00 / 1.25 倍…）でしか変えられません。細かいピッチ合わせはできません。</span>
+      <label><input type="checkbox" id="optInvert"> ピッチフェーダーの向きを反転</label>
+      <label>ジョグ感度 <input type="number" id="optJog" min="0.002" max="0.5" step="0.005" style="width:6em"> 秒/目盛</label>
+      <label><input type="checkbox" id="optLed"> コントローラーのランプを点灯させる</label>
+    </div>
+    <h3>MIDI モニター（最後に受信した信号）</h3>
+    <pre id="monitor">（コントローラーを操作するとここに表示されます）</pre>
+    <h3>割り当て一覧</h3>
+    <p class="hint">「学習」を押してからコントローラーを操作すると割り当てられます。1つの機能に複数の操作子を割り当てられます。</p>
+    <table class="maptbl" id="mapTbl"></table>
+    <div class="row">
+      <button id="btnExport">割り当てを書き出し</button>
+      <button id="btnImport">割り当てを読み込み</button>
+      <button id="btnClearMap">割り当てを全消去</button>
+      <input type="file" id="fileImport" accept=".json,application/json" hidden>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="wizard">
+  <div class="dlg">
+    <div class="hint" id="wizCount"></div>
+    <div id="wizStep"></div>
+    <div id="wizHow"></div>
+    <div id="wizInfo"></div>
+    <div class="row"><button id="wizBack">← 戻る</button><button id="wizSkip">この項目は無い／スキップ</button><button id="wizStop">終了</button></div>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
