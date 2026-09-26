@@ -35,6 +35,14 @@ body.smallvid .vid{width:min(100%,356px);align-self:center}
 .vid .unbig{display:none;position:absolute;right:10px;top:10px;z-index:3;font-size:18px;padding:10px 16px;background:rgba(0,0,0,.7)}
 .vid.big .unbig{display:block}
 .cc>button{padding:7px 6px;font-size:14px}
+/* デッキB を小さく表示（動画は YouTube の最小サイズ 356×200 を確保） */
+@media (min-width:761px){body.bmini main{grid-template-columns:minmax(0,1fr) minmax(190px,220px) 372px}}
+body.bmini .deck[data-deck=B]{padding:6px;gap:5px;font-size:13px}
+body.bmini .deck[data-deck=B] .vid{width:min(100%,356px);align-self:center}
+body.bmini .deck[data-deck=B] button{padding:6px 4px;font-size:13px;min-width:0}
+body.bmini .deck[data-deck=B] .transport button,body.bmini .deck[data-deck=B] .pads button{padding:8px 4px}
+body.bmini .deck[data-deck=B] .bar{height:18px}
+body.bmini .deck[data-deck=B] .hint{display:none}
 body.smallvid .transport button{padding:18px 6px}
 body.smallvid .pads button{padding:20px 4px}
 .dtitle{font-weight:600;min-height:1.3em}
@@ -156,6 +164,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
       <label><input type="checkbox" id="optInvert"> ピッチフェーダーの向きを反転</label>
       <label>ジョグ感度 <input type="number" id="optJog" min="0.002" max="0.5" step="0.005" style="width:6em"> 秒/目盛</label>
       <label><input type="checkbox" id="optLed"> コントローラーのランプを点灯させる</label>
+      <label><input type="checkbox" id="optBNormal"> デッキB も大きく表示する</label>
       <label style="grid-column:1/-1">YouTube API キー（検索用） <input id="optKey" type="password" autocomplete="off" spellcheck="false" style="flex:1" placeholder="AIza…"></label>
       <span class="hint" style="grid-column:1/-1">キーはこの端末の中だけに保存されます。1日あたり約100回まで検索できます。</span>
     </div>

@@ -43,7 +43,7 @@ for (const t of TARGETS) {
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
-  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false, cc: { A: false, B: false }, ccSize: 3 },
+  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false, bNormal: false, cc: { A: false, B: false }, ccSize: 3 },
   decks: {},             // A: {videoId,title,cue,hc,pos}
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
@@ -813,6 +813,7 @@ function openSettings() {
   $('#optJog').value = S.settings.jogSens;
   $('#optLed').checked = S.settings.led;
   $('#optKey').value = S.settings.ytKey || '';
+  $('#optBNormal').checked = !!S.settings.bNormal;
   $('#monitor').textContent = monitorLines.join('\n') || '（コントローラーを操作するとここに表示されます）';
   renderMapTable(); $('#settings').showModal();
 }
@@ -823,6 +824,7 @@ $('#optRange').addEventListener('change', e => { S.settings.pitchRange = +e.targ
 $('#optInvert').addEventListener('change', e => { S.settings.pitchInvert = e.target.checked; save(); });
 $('#optJog').addEventListener('change', e => { const v = +e.target.value; if (v > 0) { S.settings.jogSens = v; save(); } });
 $('#optLed').addEventListener('change', e => { S.settings.led = e.target.checked; save(); refreshLeds(); });
+$('#optBNormal').addEventListener('change', e => { S.settings.bNormal = e.target.checked; applyVideoSize(); save(); });
 $('#optKey').addEventListener('change', e => { S.settings.ytKey = e.target.value.trim(); save(); if (S.settings.ytKey) toast('API キーを保存しました'); updateSearchPlaceholder(); });
 $('#btnReconnect').addEventListener('click', initMidi);
 $('#btnClearMap').addEventListener('click', () => { if (confirm('割り当てをすべて消去しますか？')) { S.map = {}; save(); renderMapTable(); } });
@@ -892,6 +894,7 @@ $('#startBtn').addEventListener('click', () => {
 });
 function applyVideoSize() {
   document.body.classList.toggle('smallvid', !!S.settings.smallVideo);
+  document.body.classList.toggle('bmini', !S.settings.bNormal);
   $('#btnVid').textContent = S.settings.smallVideo ? '🎬 動画: 小' : '🎬 動画: 大';
 }
 $('#btnVid').addEventListener('click', () => { S.settings.smallVideo = !S.settings.smallVideo; applyVideoSize(); save(); });
