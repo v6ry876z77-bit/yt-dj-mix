@@ -125,7 +125,7 @@ class Deck {
         <button data-a="back">−10秒</button><button data-a="fwd">+10秒</button>
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
-      <div class="row"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
+      <div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
       <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button><button data-a="big">⛶ 大画面</button></div>
       <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span><button data-a="pitchReset" style="padding:4px 8px">0</button></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
@@ -562,7 +562,7 @@ function openYouTubeSearch(q) {
   toast('気に入った動画は「共有」→「YT DJ」か、「共有」→「コピー」してから戻ってきてください', 5000);
 }
 function updateSearchPlaceholder() {
-  $('#qIn').placeholder = S.settings.ytKey ? 'YouTube を検索' : 'YouTube アプリで検索';
+  $('#qIn').placeholder = S.settings.ytKey ? '検索 または URL' : 'YouTube アプリで検索 または URL';
 }
 $('#searchForm').addEventListener('submit', e => { e.preventDefault(); $('#qIn').blur(); runSearch(); });
 
@@ -624,12 +624,13 @@ async function checkClipboard(manual = false) {
   try { text = await navigator.clipboard.readText(); }
   catch (e) { if (manual) toast('クリップボードを読めませんでした。入力欄を長押しして貼り付けてください'); return; }
   const id = parseYouTubeId(text);
-  if (!id || !/youtu/.test(text)) { if (manual) { if (text) $('#urlIn').value = text; else toast('クリップボードは空です'); } return; }
+  if (!id || !/youtu/.test(text)) { if (manual) { if (text) { $('#urlIn').value = text; $('#qIn').value = text; } else toast('クリップボードは空です'); } return; }
   if (!manual && id === S.lastClip) return; // 同じリンクは何度も聞かない
   S.lastClip = id; save();
   offerClip(id);
 }
 $('#btnClip').addEventListener('click', () => checkClipboard(true));
+$('#btnClip2').addEventListener('click', () => checkClipboard(true));
 let clipCheckAt = 0;
 function autoClip() {
   if (!started || document.visibilityState !== 'visible') return;

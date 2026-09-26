@@ -34,33 +34,45 @@ body.smallvid .vid{width:min(100%,356px);align-self:center}
 .vid.big{position:fixed;left:0;top:0;width:100vw!important;height:min(82vh,56.25vw);aspect-ratio:auto;z-index:40;border-radius:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.75)}
 .vid .unbig{display:none;position:absolute;right:10px;top:10px;z-index:3;font-size:18px;padding:10px 16px;background:rgba(0,0,0,.7)}
 .vid.big .unbig{display:block}
-.cc>button{padding:7px 6px;font-size:14px}
+.cc>button{padding:5px 6px;font-size:13px}
 /* デッキB を小さく表示（動画は YouTube の最小サイズ 356×200 を確保） */
-@media (min-width:761px){body.bmini main{grid-template-columns:minmax(0,1fr) minmax(190px,220px) 372px}}
+@media (min-width:761px){
+  body.bmini main{grid-template-columns:minmax(0,1fr) 372px;grid-template-areas:"a b" "a m";grid-template-rows:auto 1fr;align-items:start}
+  body.bmini .deck[data-deck=A]{grid-area:a}
+  body.bmini .deck[data-deck=B]{grid-area:b}
+  body.bmini .mixer{grid-area:m}
+  body.bmini .deck[data-deck=A] .vid{width:min(100%,calc((100vh - 400px) * 16 / 9));align-self:center}
+  body.bmini .deck[data-deck=A] .hint{display:none}
+  body.bmini .mixer .vols input{height:90px}
+  body.bmini .mixer .paste{display:none}
+  body.bmini .hist{max-height:max(120px,calc(100vh - 640px))}
+}
+body.bmini .deck[data-deck=B] .pads,body.bmini .deck[data-deck=B] .loops,body.bmini .deck[data-deck=B] .cc{display:none}
 body.bmini .deck[data-deck=B]{padding:6px;gap:5px;font-size:13px}
 body.bmini .deck[data-deck=B] .vid{width:min(100%,356px);align-self:center}
 body.bmini .deck[data-deck=B] button{padding:6px 4px;font-size:13px;min-width:0}
 body.bmini .deck[data-deck=B] .transport button,body.bmini .deck[data-deck=B] .pads button{padding:8px 4px}
-body.bmini .deck[data-deck=B] .bar{height:18px}
+body.bmini .deck[data-deck=B] .bar{height:10px}
 body.bmini .deck[data-deck=B] .hint{display:none}
 body.smallvid .transport button{padding:18px 6px}
 body.smallvid .pads button{padding:20px 4px}
 .dtitle{font-weight:600;min-height:1.3em}
 .dtitle .tag{display:inline-block;font-weight:800;margin-right:6px}
 .deck[data-deck=A] .tag{color:var(--a)} .deck[data-deck=B] .tag{color:var(--b)}
-.bar{position:relative;height:26px;background:var(--panel2);border-radius:6px;overflow:hidden;cursor:pointer;touch-action:none}
+.bar{position:relative;height:12px;background:var(--panel2);border-radius:6px;overflow:hidden;cursor:pointer;touch-action:none}
 .bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.18)}
 .bar .loopz{position:absolute;top:0;bottom:0;background:rgba(61,220,132,.3);display:none}
 .bar .mk{position:absolute;top:0;bottom:0;width:2px;background:var(--warn)}
 .bar .mk.hc{background:#c77dff;height:50%}
 .bar .ph{position:absolute;top:0;bottom:0;width:2px;background:#fff}
-.time{display:flex;gap:10px;color:var(--dim);font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.time{display:flex;gap:10px;font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums;flex-wrap:wrap}
 .time .rate{margin-left:auto}
 .row{display:flex;gap:6px;flex-wrap:wrap}
 .row>button{flex:1 1 0;min-width:56px}
-.transport button{padding:12px 6px;font-weight:700}
+.deck button{padding:6px 6px;font-size:14px}
+.transport button{padding:7px 6px;font-weight:700}
 .pads{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-.pads button{background:var(--pad);padding:12px 4px;font-weight:700}
+.pads button{background:var(--pad);padding:7px 4px;font-weight:700}
 .pads button.set{background:#6b3fa0;border-color:#c77dff}
 .pitch{display:flex;align-items:center;gap:8px}
 .pitch input{flex:1}
@@ -143,7 +155,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
       <div class="row"><button data-load="A">A へ</button><button data-load="B">B へ</button><button id="btnAddHist">履歴へ</button></div>
       <span class="hint">YouTube で見つけた動画は「共有」→「YT DJ」、または「共有」→「コピー」してからこの画面に戻ると読み込めます。</span>
     </div>
-    <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="YouTube を検索" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button></form>
+    <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="検索 または URL" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button><button type="button" id="btnClip2" style="flex:0 0 auto" title="クリップボードから貼り付け">📋</button></form>
     <div class="row seg"><button id="segS">検索結果</button><button id="segH" class="on">履歴</button></div>
     <ul id="srch" class="hist" hidden></ul>
     <ul id="hist" class="hist"></ul>
