@@ -101,7 +101,7 @@ class Deck {
     this.jogAcc = 0; this.lastJog = 0;
     this.priming = false; this.primeAt = 0;
     this.cuePreview = false; this.playLatch = false;
-    this.lastVolSent = -1;
+    this.lastVolSent = -1; this.lastMuteCheck = 0;
     const saved = S.decks[name];
     if (saved) {
       this.videoId = saved.videoId || ''; this.title = saved.title || '';
@@ -119,7 +119,7 @@ class Deck {
       <div class="vid"><div id="player${n}"></div></div>
       <div class="dtitle"><span class="tag">${n}</span><span class="tt">未ロード</span></div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
-      <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="rate">×1.00</span></div>
+      <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span><span class="rate">×1.00</span></div>
       <div class="row transport">
         <button data-a="cue">CUE</button><button data-a="play">▶ / ❚❚</button>
         <button data-a="back">−10秒</button><button data-a="fwd">+10秒</button>
@@ -131,7 +131,7 @@ class Deck {
     this.ui = {
       tt: $('.tt', this.el), bar: $('.bar', this.el), fill: $('.fill', this.el), ph: $('.ph', this.el),
       marks: $('.marks', this.el), loopz: $('.loopz', this.el), cur: $('.cur', this.el), dur: $('.dur', this.el),
-      remain: $('.remain', this.el), rate: $('.rate', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
+      remain: $('.remain', this.el), snd: $('.snd', this.el), rate: $('.rate', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
       pads: $$('[data-hc]', this.el),
     };
@@ -253,7 +253,7 @@ class Deck {
     switch (a) {
       case 'play':
         if (this.cuePreview) { this.playLatch = true; break; }
-        if (this.playing) this.player.pauseVideo(); else this.player.playVideo();
+        if (this.playing) this.player.pauseVideo(); else { this.player.unMute(); this.applyVolume(true); this.player.playVideo(); }
         break;
       case 'back': this.seek(this.now() - (shiftHeld ? 30 : 10)); break;
       case 'fwd': this.seek(this.now() + (shiftHeld ? 30 : 10)); break;
@@ -321,6 +321,10 @@ class Deck {
       this.base = this.primeAt; return;
     }
     if (this.priming && t - this.primeStarted > 15000) { this.priming = false; this.player.unMute(); this.applyVolume(true); }
+    if (!this.priming && t - this.lastMuteCheck > 500) {
+      this.lastMuteCheck = t;
+      try { if (this.player.isMuted()) { this.player.unMute(); this.applyVolume(true); } } catch (e) { }
+    }
     const cur = this.now();
     if (this.loop.on && this.loop.out != null && this.playing && cur >= this.loop.out) this.seek(this.loop.in);
     // ジョグ（まとめて適用）
@@ -363,6 +367,14 @@ class Deck {
     this.ui.remain.textContent = this.dur ? `残り ${fmt(this.dur - cur)}` : '';
     const want = this.wantRate, act = this.rateActual || 1;
     this.ui.rate.textContent = Math.abs(want - act) > 0.004 ? `×${act.toFixed(2)}（指定 ${want.toFixed(3)}）` : `×${act.toFixed(3)}`;
+    let snd = '';
+    if (this.videoId && this.ready && !this.priming) {
+      let muted = false; try { muted = this.player.isMuted(); } catch (e) { }
+      if (muted) snd = '🔇 消音中';
+      else if (this.lastVolSent === 0) snd = this.vol === 0 ? '🔈 音量フェーダー 0' : '🔈 クロスフェーダーで無音';
+      else snd = `🔊 ${this.lastVolSent}`;
+    }
+    if (this.ui.snd.textContent !== snd) this.ui.snd.textContent = snd;
     this.ui.play.classList.toggle('on', this.playing);
     this.ui.cue.classList.toggle('on', this.cuePreview);
   }
