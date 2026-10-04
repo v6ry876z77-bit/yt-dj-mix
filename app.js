@@ -103,6 +103,7 @@ class Deck {
     this.priming = false; this.primeAt = 0;
     this.cuePreview = false; this.playLatch = false;
     this.lastVolSent = -1; this.lastMuteCheck = 0;
+    this.hl = 'ja'; this.resumeAfterPrime = false; // hl: プレーヤーの言語（字幕の選ばれ方が変わる）
     const saved = S.decks[name];
     if (saved) {
       this.videoId = saved.videoId || ''; this.title = saved.title || '';
@@ -170,7 +171,9 @@ class Deck {
   }
   /* --- YouTube --- */
   createPlayer() {
-    const pv = { playsinline: 1, controls: 0, disablekb: 1, rel: 0, iv_load_policy: 3, fs: 0, hl: 'ja', cc_lang_pref: 'ja' };
+    const pv = { playsinline: 1, controls: 0, disablekb: 1, rel: 0, iv_load_policy: 3, fs: 0 };
+    // 日本語設定だと日本語字幕を優先するが、日本語字幕が無い動画では自動字幕も選ばれない。その場合は rebuild('') で外す
+    if (this.hl) { pv.hl = this.hl; pv.cc_lang_pref = this.hl; }
     if (location.origin && location.origin !== 'null') pv.origin = location.origin;
     this.player = new YT.Player(`player${this.name}`, {
       width: '100%', height: '100%', playerVars: pv,
@@ -185,12 +188,26 @@ class Deck {
       },
     });
   }
+  /* プレーヤーを作り直す（再生位置・再生中かどうかは引き継ぐ） */
+  rebuild(hl) {
+    const wasPlaying = this.playing;
+    this.restorePos = this.videoId ? this.now() : 0;
+    this.resumeAfterPrime = wasPlaying;
+    this.ready = false; this.ccFor = null; this.hl = hl;
+    try { this.player.destroy(); } catch (e) { }
+    const old = document.getElementById(`player${this.name}`); if (old) old.remove();
+    const div = document.createElement('div'); div.id = `player${this.name}`;
+    this.ui.vid.prepend(div);
+    this.createPlayer();
+  }
   load(id, start = 0, keepCues = false) {
-    if (!this.ready) { this.videoId = id; this.restorePos = start; return; }
     if (!keepCues || id !== this.videoId) {
       this.cue = start; this.hc = Array(NCUES).fill(null); this.loop = { in: null, out: null, on: false };
       const h = S.hist.find(x => x.id === id); this.title = h ? h.title : '';
+      // 別の曲に替えるときは日本語設定のプレーヤーに戻す
+      if (this.ready && this.hl !== 'ja') { this.videoId = id; this.rebuild('ja'); this.restorePos = start; this.resumeAfterPrime = false; this.renderStatic(); return; }
     }
+    if (!this.ready) { this.videoId = id; this.restorePos = start; return; }
     this.videoId = id; this.dur = 0; this.appliedRate = null;
     this.base = start; this.stamp = performance.now(); this.lastRaw = -1;
     // 先頭を読み込ませてから一時停止しておく（すぐに再生できるように）。この間は消音。
@@ -208,6 +225,7 @@ class Deck {
     }
     if (this.priming && (s === YT.PlayerState.PAUSED || s === YT.PlayerState.CUED)) {
       this.priming = false; this.player.unMute(); this.applyVolume(true);
+      if (this.resumeAfterPrime) { this.resumeAfterPrime = false; this.player.playVideo(); }
     }
     if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.PAUSED || s === YT.PlayerState.CUED) {
       const d = this.player.getDuration(); if (d) this.dur = d;
@@ -331,8 +349,12 @@ class Deck {
       this.setCaptionSize();
       if (hasCc()) return;
       setTimeout(() => { // 読み込みが遅い場合に備えてもう一度だけ確認
-        if (this.ccFor === this.videoId && S.settings.cc[this.name] && !hasCc()) toast(`デッキ${this.name}: この動画には字幕がありません`, 2000);
         this.setCaptionSize();
+        if (this.ccFor !== this.videoId || !S.settings.cc[this.name] || hasCc()) return;
+        if (this.hl === 'ja') { // 日本語字幕が無い → 言語指定なしで作り直すと英語などの自動字幕が出る
+          toast(`デッキ${this.name}: 日本語字幕が無いので、ほかの言語の字幕に切り替えます`, 2500);
+          this.rebuild('');
+        } else toast(`デッキ${this.name}: この動画には字幕がありません`, 2000);
       }, 3000);
     }, 1500);
   }
