@@ -4,6 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
+const APP_VERSION = '2026-10-04b';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -172,7 +173,7 @@ class Deck {
   /* --- YouTube --- */
   createPlayer() {
     const pv = { playsinline: 1, controls: 0, disablekb: 1, rel: 0, iv_load_policy: 3, fs: 0 };
-    // 日本語設定だと日本語字幕を優先するが、日本語字幕が無い動画では自動字幕も選ばれない。その場合は rebuild('') で外す
+    // 日本語設定だと日本語字幕を優先するが、日本語字幕が無い動画では自動字幕も選ばれない。その場合は rebuild('en') で英語に切り替える
     if (this.hl) { pv.hl = this.hl; pv.cc_lang_pref = this.hl; }
     if (location.origin && location.origin !== 'null') pv.origin = location.origin;
     this.player = new YT.Player(`player${this.name}`, {
@@ -353,7 +354,7 @@ class Deck {
         if (this.ccFor !== this.videoId || !S.settings.cc[this.name] || hasCc()) return;
         if (this.hl === 'ja') { // 日本語字幕が無い → 言語指定なしで作り直すと英語などの自動字幕が出る
           toast(`デッキ${this.name}: 日本語字幕が無いので、ほかの言語の字幕に切り替えます`, 2500);
-          this.rebuild('');
+          this.rebuild('en'); // 言語指定なしだと端末の言語（日本語）が使われるので英語を明示
         } else toast(`デッキ${this.name}: この動画には字幕がありません`, 2000);
       }, 3000);
     }, 1500);
@@ -842,6 +843,7 @@ $('#mapTbl').addEventListener('click', e => {
   }
 });
 function openSettings() {
+  $('#appVer').textContent = `バージョン ${APP_VERSION}`;
   $('#optRange').value = String(S.settings.pitchRange);
   $('#optInvert').checked = S.settings.pitchInvert;
   $('#optJog').value = S.settings.jogSens;
