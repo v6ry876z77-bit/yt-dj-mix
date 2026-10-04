@@ -321,11 +321,19 @@ class Deck {
     this.ccFor = this.videoId;
     try { this.player.loadModule('captions'); } catch (e) { }
     // 言語はプレーヤー作成時の cc_lang_pref（日本語優先）で決まる。字幕の読み込みを待ってから大きさを反映
-    setTimeout(() => {
+    // 自動生成字幕は tracklist に入らないので、実際に選ばれている字幕（track）も見て判定する
+    const hasCc = () => {
       try {
-        if (!(this.player.getOption('captions', 'tracklist') || []).length) toast(`デッキ${this.name}: この動画には字幕がありません`, 2000);
-      } catch (e) { }
+        return (this.player.getOption('captions', 'tracklist') || []).length > 0 || !!this.player.getOption('captions', 'track')?.languageCode;
+      } catch (e) { return true; }
+    };
+    setTimeout(() => {
       this.setCaptionSize();
+      if (hasCc()) return;
+      setTimeout(() => { // 読み込みが遅い場合に備えてもう一度だけ確認
+        if (this.ccFor === this.videoId && S.settings.cc[this.name] && !hasCc()) toast(`デッキ${this.name}: この動画には字幕がありません`, 2000);
+        this.setCaptionSize();
+      }, 3000);
     }, 1500);
   }
   setCaptionSize() { try { this.player.setOption('captions', 'fontSize', S.settings.ccSize); } catch (e) { } }
