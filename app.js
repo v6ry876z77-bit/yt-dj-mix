@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10d';
+const APP_VERSION = '2026-10-10e';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -44,7 +44,7 @@ for (const t of TARGETS) {
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
-  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false, bMode: 'hide', cc: { A: false, B: false }, ccSize: 3 },
+  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false, bMode: 'hide', cc: { A: true, B: true }, ccSize: 3 },
   decks: {},             // A: {videoId,title,cue,hc,pos}
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
@@ -55,6 +55,8 @@ try {
   if (raw) { const o = JSON.parse(raw); S = Object.assign(defaults(), o); S.settings = Object.assign(defaults().settings, o.settings || {}); S.settings.cc = Object.assign({ A: false, B: false }, S.settings.cc);
     if (o.settings && o.settings.bNormal) S.settings.bMode = 'normal'; delete S.settings.bNormal; }
 } catch (e) { /* 保存領域が使えなくても動作は続ける */ }
+// 起動時は字幕をオンにする（途中でオフにしても、次に開いたときはまたオン）
+S.settings.cc = { A: true, B: true };
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
