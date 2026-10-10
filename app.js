@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10l';
+const APP_VERSION = '2026-10-10m';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -265,11 +265,12 @@ class Deck {
     this.applyVolume(true); // 音はすぐ消す
     this.freezeAt(t);
   }
-  /* その位置で映像を止める。YouTube のバーが出ている最中に止めるとバーが残るので、その場合は
-     「再生中扱い」にしてバーを自動で消させる（このとき 0.25 秒ほどの映像が無音で繰り返される） */
+  /* その位置で映像を止める。seekTo(t, false) だけだとタブレットでは映像が流れ続けることがあるので、
+     続けて pauseVideo() で確実に止める（この順なら一時停止のバーは出ない。
+     ただし再生開始・シーク直後でバーが出ている最中に止めた場合は、バーが残る） */
   freezeAt(t) {
     this.player.seekTo(t, false);
-    if (performance.now() - this.lastChromeAt < 4000) this.player.playVideo();
+    this.player.pauseVideo();
   }
   /* 再開: 止めた位置へ通常のシークをしてから再生（playVideo だけだと止まったまま） */
   resume() {
