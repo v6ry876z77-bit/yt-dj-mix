@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10i';
+const APP_VERSION = '2026-10-10j';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -44,7 +44,7 @@ for (const t of TARGETS) {
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
-  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', smallVideo: false, bMode: 'hide', cc: { A: true, B: true }, ccSize: 3 },
+  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', bMode: 'hide', cc: { A: true, B: true }, ccSize: 3 },
   decks: {},             // A: {videoId,title,cue,hc,pos}
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
@@ -57,6 +57,7 @@ try {
 } catch (e) { /* 保存領域が使えなくても動作は続ける */ }
 // 起動時は字幕をオンにする（途中でオフにしても、次に開いたときはまたオン）
 S.settings.cc = { A: true, B: true };
+delete S.settings.smallVideo; // 廃止した「動画: 大／小」の設定を消す
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
@@ -960,15 +961,12 @@ document.addEventListener('pointerdown', e => {
 }, { once: true, capture: true });
 const BMODE_LABEL = { hide: 'B: 隠す', mini: 'B: 小', normal: 'B: 通常' };
 function applyVideoSize() {
-  document.body.classList.toggle('smallvid', !!S.settings.smallVideo);
   // 隠すモードでも B が再生中なら小さく表示する（見えないまま鳴らさない）
   const m = S.settings.bMode === 'hide' && window.YT && deckOf('B').playing ? 'mini' : S.settings.bMode;
   document.body.classList.toggle('bhide', m === 'hide');
   document.body.classList.toggle('bmini', m === 'mini');
   $('#btnBMode').textContent = BMODE_LABEL[S.settings.bMode] || BMODE_LABEL.hide;
-  $('#btnVid').textContent = S.settings.smallVideo ? '🎬 動画: 小' : '🎬 動画: 大';
 }
-$('#btnVid').addEventListener('click', () => { S.settings.smallVideo = !S.settings.smallVideo; applyVideoSize(); save(); });
 $('#btnBMode').addEventListener('click', () => {
   const order = ['hide', 'mini', 'normal'];
   S.settings.bMode = order[(order.indexOf(S.settings.bMode) + 1) % order.length]; applyVideoSize(); save();

@@ -30,7 +30,6 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(
 .vid{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
 .vid iframe,.vid>div{position:absolute;inset:0;width:100%;height:100%}
 .vid .shield{z-index:2;background:transparent;touch-action:manipulation}
-body.smallvid .vid{width:min(100%,356px);align-self:center}
 .cc>button{padding:5px 6px;font-size:13px}
 .lc{display:flex;flex-direction:column;gap:7px}
 .lc>.row{flex:1 1 0;min-width:0}
@@ -56,8 +55,6 @@ body.bmini .deck[data-deck=B] button{padding:6px 4px;font-size:13px;min-width:0}
 body.bmini .deck[data-deck=B] .transport button,body.bmini .deck[data-deck=B] .pads button{padding:8px 4px}
 body.bmini .deck[data-deck=B] .bar{height:10px}
 body.bmini .deck[data-deck=B] .hint{display:none}
-body.smallvid .transport button{padding:18px 6px}
-body.smallvid .pads button{padding:20px 4px}
 .bar{position:relative;height:12px;background:var(--panel2);border-radius:6px;overflow:hidden;cursor:pointer;touch-action:none}
 .bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.18)}
 .bar .loopz{position:absolute;top:0;bottom:0;background:rgba(61,220,132,.3);display:none}
@@ -124,7 +121,6 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
   <span><span id="midiDot" class="dot"></span><span id="midiName">MIDI 未接続</span></span>
   <button id="btnSettings">⚙ 設定・割り当て</button>
   <button id="btnBMode">B: 隠す</button>
-  <button id="btnVid">🎬 動画: 大</button>
   <button id="btnFull">⛶ 全画面</button>
 </header>
 <div id="tapHint" hidden>👆 画面のどこかを1回タップすると、コントローラーで再生できるようになります</div>
@@ -197,7 +193,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-10i"></script>
+<script src="app.js?v=2026-10-10j"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
