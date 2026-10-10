@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10e';
+const APP_VERSION = '2026-10-10f';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -128,7 +128,6 @@ class Deck {
   buildUI() {
     const n = this.name;
     this.el.innerHTML = `
-      <div class="dtitle"><span class="tag">${n}</span><span class="tt">未ロード</span></div>
       <div class="vid"><div id="player${n}"></div><div class="shield"></div></div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span><span class="rate">×1.00</span></div>
@@ -142,7 +141,7 @@ class Deck {
       <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span><button data-a="pitchReset" style="padding:4px 8px">0</button></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
     this.ui = {
-      tt: $('.tt', this.el), bar: $('.bar', this.el), fill: $('.fill', this.el), ph: $('.ph', this.el),
+      bar: $('.bar', this.el), fill: $('.fill', this.el), ph: $('.ph', this.el),
       marks: $('.marks', this.el), loopz: $('.loopz', this.el), cur: $('.cur', this.el), dur: $('.dur', this.el),
       remain: $('.remain', this.el), snd: $('.snd', this.el), rate: $('.rate', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
@@ -399,7 +398,6 @@ class Deck {
     }
   }
   renderStatic() {
-    this.ui.tt.textContent = this.videoId ? (this.title || this.videoId) : '未ロード';
     this.ui.pads.forEach((b, i) => b.classList.toggle('set', this.hc[i] != null));
     let h = '';
     if (this.dur) {

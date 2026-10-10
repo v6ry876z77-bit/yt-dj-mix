@@ -38,11 +38,10 @@ body.smallvid .vid{width:min(100%,356px);align-self:center}
 body.bhide .deck[data-deck=B]{display:none}
 @media (min-width:761px){
   body.bhide main{grid-template-columns:minmax(0,1fr) minmax(190px,230px);align-items:start}
-  body.bhide .deck[data-deck=A] .vid{width:min(100%,calc((100vh - 322px) * 16 / 9));align-self:center}
+  body.bhide .deck[data-deck=A] .vid{width:min(100%,calc((100vh - 293px) * 16 / 9));align-self:center}
   body.bhide .deck[data-deck=A] .lc{flex-direction:row}
 }
 body.bhide .deck[data-deck=A] .pads{grid-template-columns:repeat(8,minmax(0,1fr))}
-body.bhide .deck[data-deck=A] .dtitle{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body.bhide .deck[data-deck=A] .hint{display:none}
 /* デッキB を小さく表示（動画は YouTube の最小サイズ 356×200 を確保） */
 @media (min-width:761px){
@@ -59,9 +58,6 @@ body.bmini .deck[data-deck=B] .bar{height:10px}
 body.bmini .deck[data-deck=B] .hint{display:none}
 body.smallvid .transport button{padding:18px 6px}
 body.smallvid .pads button{padding:20px 4px}
-.dtitle{font-weight:600;min-height:1.3em}
-.dtitle .tag{display:inline-block;font-weight:800;margin-right:6px}
-.deck[data-deck=A] .tag{color:var(--a)} .deck[data-deck=B] .tag{color:var(--b)}
 .bar{position:relative;height:12px;background:var(--panel2);border-radius:6px;overflow:hidden;cursor:pointer;touch-action:none}
 .bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.18)}
 .bar .loopz{position:absolute;top:0;bottom:0;background:rgba(61,220,132,.3);display:none}
@@ -201,7 +197,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-10e"></script>
+<script src="app.js?v=2026-10-10f"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
