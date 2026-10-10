@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10c';
+const APP_VERSION = '2026-10-10d';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -86,6 +86,14 @@ function parseYouTubeId(s) {
   return null;
 }
 let shiftHeld = false;
+const hasTouched = () => (navigator.userActivation ? navigator.userActivation.hasBeenActive : touchedOnce);
+let touchedOnce = false;
+function needTouchHint() {
+  if (hasTouched()) return false;
+  $('#tapHint').hidden = false;
+  toast('先に画面のどこかを1回タップしてください（ブラウザの決まりで、最初の再生には画面へのタッチが必要です）', 4000);
+  return true;
+}
 
 /* ---------- デッキ ---------- */
 class Deck {
@@ -264,7 +272,8 @@ class Deck {
     switch (a) {
       case 'play':
         if (this.cuePreview) { this.playLatch = true; break; }
-        if (this.playing) this.player.pauseVideo(); else { this.player.unMute(); this.applyVolume(true); this.player.playVideo(); }
+        if (this.playing) this.player.pauseVideo();
+        else { if (needTouchHint()) break; this.player.unMute(); this.applyVolume(true); this.player.playVideo(); }
         break;
       case 'back': this.seek(this.now() - (shiftHeld ? 30 : 10)); break;
       case 'fwd': this.seek(this.now() + (shiftHeld ? 30 : 10)); break;
@@ -285,7 +294,7 @@ class Deck {
     if (!this.videoId || this.priming) return;
     if (this.playing && !this.cuePreview) { this.player.pauseVideo(); this.seek(this.cue); return; }
     const t = this.now();
-    if (Math.abs(t - this.cue) < 0.2) { this.cuePreview = true; this.playLatch = false; this.player.playVideo(); }
+    if (Math.abs(t - this.cue) < 0.2) { if (needTouchHint()) return; this.cuePreview = true; this.playLatch = false; this.player.playVideo(); }
     else { this.cue = t; this.renderStatic(); save(); }
   }
   cueUp() {
@@ -298,7 +307,7 @@ class Deck {
     if (!this.videoId) { toast(`デッキ${this.name} に曲がありません`); return; }
     if (shiftHeld) { this.deleteHotcue(i); return; }
     if (this.hc[i] == null) { this.hc[i] = this.now(); toast(`パッド${i + 1} に登録 (${fmt(this.hc[i])})`, 1200); }
-    else { this.seek(this.hc[i]); if (!this.playing) this.player.playVideo(); }
+    else { this.seek(this.hc[i]); if (!this.playing && !needTouchHint()) this.player.playVideo(); }
     this.renderStatic(); refreshLeds(); save();
   }
   deleteHotcue(i) {
@@ -902,9 +911,11 @@ document.addEventListener('visibilitychange', keepAwake);
 initMidi(); keepAwake();
 if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
 // 自動再生が許可されず準備できなかった曲は、最初に画面を触った時に準備し直す
-document.addEventListener('pointerdown', () => {
+if (!hasTouched()) $('#tapHint').hidden = false;
+document.addEventListener('pointerdown', e => {
+  touchedOnce = true; $('#tapHint').hidden = true;
   keepAwake();
-  if (!window.YT) return;
+  if (!window.YT || e.target.closest('button')) return; // ボタンを押した場合はその操作を優先する
   for (const d of decks) {
     if (d.ready && d.videoId && (d.priming || d.state === YT.PlayerState.UNSTARTED || d.state === YT.PlayerState.CUED)) d.load(d.videoId, d.priming ? d.primeAt : d.now(), true);
   }
