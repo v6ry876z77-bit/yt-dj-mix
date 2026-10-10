@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10f';
+const APP_VERSION = '2026-10-10g';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -114,6 +114,9 @@ class Deck {
     this.priming = false; this.primeAt = 0;
     this.cuePreview = false; this.playLatch = false;
     this.lastVolSent = -1; this.lastMuteCheck = 0;
+    // 一時停止は「その位置で映像を止める」方式（本当の一時停止だとロゴや「その他の動画」が出て字幕が隠れるため）
+    this.softPaused = false; this.softT = 0; this.ccDragTimer = null;
+    this.freezeTimer = null; this.lastChromeAt = 0; // lastChromeAt: YouTube のバーが最後に出た時刻（再生開始・シーク）
     const saved = S.decks[name];
     if (saved) {
       this.videoId = saved.videoId || ''; this.title = saved.title || '';
@@ -137,7 +140,7 @@ class Deck {
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
       <div class="lc"><div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
-      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button></div></div>
+      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button><button data-a="ccDrag">字幕の位置</button></div></div>
       <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span><button data-a="pitchReset" style="padding:4px 8px">0</button></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
     this.ui = {
@@ -146,6 +149,7 @@ class Deck {
       remain: $('.remain', this.el), snd: $('.snd', this.el), rate: $('.rate', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
       pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el),
+      ccDrag: $('[data-a=ccDrag]', this.el), shield: $('.shield', this.el),
     };
     // ボタン（CUE は押している間だけプレビューするので pointerdown/up を使う）
     for (const b of $$('[data-a]', this.el)) {
@@ -154,7 +158,7 @@ class Deck {
         b.addEventListener('pointerdown', e => { e.preventDefault(); this.cueDown(); });
         b.addEventListener('pointerup', () => this.cueUp());
         b.addEventListener('pointercancel', () => this.cueUp());
-      } else if (a === 'cc' || a === 'ccMinus' || a === 'ccPlus') {
+      } else if (a === 'cc' || a === 'ccMinus' || a === 'ccPlus' || a === 'ccDrag') {
         b.addEventListener('click', () => this.view(a));
       } else if (a === 'pitchReset') {
         b.addEventListener('click', () => this.setPitch(0));
@@ -203,7 +207,8 @@ class Deck {
       const h = S.hist.find(x => x.id === id); this.title = h ? h.title : '';
     }
     if (!this.ready) { this.videoId = id; this.restorePos = start; return; }
-    this.videoId = id; this.dur = 0; this.appliedRate = null;
+    this.videoId = id; this.dur = 0; this.appliedRate = null; this.softPaused = false;
+    clearTimeout(this.freezeTimer); this.freezeTimer = null;
     this.base = start; this.stamp = performance.now(); this.lastRaw = -1;
     // 先頭を読み込ませてから一時停止しておく（すぐに再生できるように）。この間は消音。
     this.priming = true; this.primeAt = start; this.primeStarted = performance.now();
@@ -214,6 +219,7 @@ class Deck {
   }
   onState(s) {
     this.state = s;
+    if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.BUFFERING) this.lastChromeAt = performance.now();
     if (this.priming && s === YT.PlayerState.PLAYING) {
       this.player.pauseVideo(); this.player.seekTo(this.primeAt, true);
       return;
@@ -246,6 +252,7 @@ class Deck {
   now() {
     if (!this.ready || !this.videoId) return 0;
     if (this.priming) return this.primeAt;
+    if (this.softPaused) return this.softT;
     const raw = this.player.getCurrentTime() || 0;
     const t = performance.now();
     if (raw !== this.lastRaw) { this.lastRaw = raw; this.base = raw; this.stamp = t; }
@@ -254,11 +261,42 @@ class Deck {
     }
     return this.base;
   }
-  get playing() { return this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING; }
+  get playing() { return !this.softPaused && (this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING); }
+  /* 止める: seekTo(t, false) はシークバーを掴んだ状態になり、映像がその位置で止まる。このときロゴ等の表示が出ない */
+  pauseSoft(t = this.now()) {
+    clearTimeout(this.freezeTimer); this.freezeTimer = null;
+    this.softPaused = true; this.softT = t; this.base = t;
+    this.applyVolume(true); // 音はすぐ消す
+    // バーが出ている最中に止めるとバーが残るので、消えるまで（約4秒）待ってから止める
+    const wait = this.lastChromeAt + 4000 - performance.now();
+    if (wait > 50) this.freezeTimer = setTimeout(() => this.freezeNow(), wait);
+    else this.freezeNow();
+  }
+  freezeNow() {
+    this.freezeTimer = null;
+    if (this.softPaused) this.player.seekTo(this.softT, false);
+  }
+  /* 再開: 止めた位置へ通常のシークをしてから再生（playVideo だけだと止まったまま） */
+  resume() {
+    if (needTouchHint()) return;
+    clearTimeout(this.freezeTimer); this.freezeTimer = null;
+    this.player.unMute();
+    if (this.softPaused) {
+      this.softPaused = false; this.applyVolume(true);
+      this.player.seekTo(this.softT, true);
+      this.base = this.softT; this.stamp = performance.now(); this.lastRaw = -1;
+    } else this.applyVolume(true);
+    this.player.playVideo();
+  }
   seek(t) {
     if (!this.ready || !this.videoId) return;
     t = Math.max(0, this.dur ? Math.min(t, this.dur - 0.05) : t);
     if (this.priming) { this.primeAt = t; this.base = t; return; }
+    if (this.softPaused) { // 止めたまま位置だけ動かす（止める処理が予約中なら、その位置で止まる）
+      this.softT = t; this.base = t;
+      if (!this.freezeTimer) this.player.seekTo(t, false);
+      return;
+    }
     if (this.state === YT.PlayerState.CUED || this.state === YT.PlayerState.UNSTARTED) {
       this.load(this.videoId, t, true); return;
     }
@@ -273,8 +311,8 @@ class Deck {
     switch (a) {
       case 'play':
         if (this.cuePreview) { this.playLatch = true; break; }
-        if (this.playing) this.player.pauseVideo();
-        else { if (needTouchHint()) break; this.player.unMute(); this.applyVolume(true); this.player.playVideo(); }
+        if (this.playing) this.pauseSoft();
+        else this.resume();
         break;
       case 'back': this.seek(this.now() - (shiftHeld ? 30 : 10)); break;
       case 'fwd': this.seek(this.now() + (shiftHeld ? 30 : 10)); break;
@@ -293,22 +331,27 @@ class Deck {
   }
   cueDown() {
     if (!this.videoId || this.priming) return;
-    if (this.playing && !this.cuePreview) { this.player.pauseVideo(); this.seek(this.cue); return; }
+    if (this.playing && !this.cuePreview) { this.pauseSoft(this.cue); return; }
     const t = this.now();
-    if (Math.abs(t - this.cue) < 0.2) { if (needTouchHint()) return; this.cuePreview = true; this.playLatch = false; this.player.playVideo(); }
+    if (Math.abs(t - this.cue) < 0.2) {
+      if (needTouchHint()) return;
+      this.cuePreview = true; this.playLatch = false;
+      if (this.softPaused) this.softT = this.cue;
+      this.resume();
+    }
     else { this.cue = t; this.renderStatic(); save(); }
   }
   cueUp() {
     if (!this.cuePreview) return;
     this.cuePreview = false;
-    if (!this.playLatch) { this.player.pauseVideo(); this.seek(this.cue); }
+    if (!this.playLatch) this.pauseSoft(this.cue);
     this.playLatch = false;
   }
   hotcue(i) {
     if (!this.videoId) { toast(`デッキ${this.name} に曲がありません`); return; }
     if (shiftHeld) { this.deleteHotcue(i); return; }
     if (this.hc[i] == null) { this.hc[i] = this.now(); toast(`パッド${i + 1} に登録 (${fmt(this.hc[i])})`, 1200); }
-    else { this.seek(this.hc[i]); if (!this.playing && !needTouchHint()) this.player.playVideo(); }
+    else { this.seek(this.hc[i]); if (!this.playing) this.resume(); }
     this.renderStatic(); refreshLeds(); save();
   }
   deleteHotcue(i) {
@@ -318,6 +361,17 @@ class Deck {
   /* --- 字幕（YouTube プレーヤーの字幕を大きく表示） --- */
   view(a) {
     const cc = S.settings.cc;
+    if (a === 'ccDrag') {
+      const on = this.ui.shield.style.display !== 'none';
+      clearTimeout(this.ccDragTimer);
+      const off = () => { this.ui.shield.style.display = ''; this.ui.ccDrag.classList.remove('on'); };
+      if (on) {
+        this.ui.shield.style.display = 'none'; this.ui.ccDrag.classList.add('on');
+        toast('30秒間、字幕を指で上へドラッグしてみてください（もう一度押すと終了）', 4000);
+        this.ccDragTimer = setTimeout(off, 30000);
+      } else off();
+      return;
+    }
     if (a === 'cc') {
       cc[this.name] = !cc[this.name];
       if (cc[this.name]) this.applyCaptions(); else { this.ccFor = null; try { this.player.unloadModule('captions'); } catch (e) { } }
@@ -365,7 +419,7 @@ class Deck {
     if (!this.ready) return;
     const xf = S.xf;
     const g = this.name === 'A' ? (xf <= 0.5 ? 1 : (1 - xf) * 2) : (xf >= 0.5 ? 1 : xf * 2);
-    const v = Math.round(100 * this.vol * g);
+    const v = this.softPaused ? 0 : Math.round(100 * this.vol * g);
     if (force || v !== this.lastVolSent) { this.player.setVolume(v); this.lastVolSent = v; }
   }
   /* --- 定期処理 --- */
