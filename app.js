@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10j';
+const APP_VERSION = '2026-10-10k';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -134,7 +134,7 @@ class Deck {
     this.el.innerHTML = `
       <div class="vid"><div id="player${n}"></div><div class="shield"></div></div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
-      <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span><span class="rate">×1.00</span></div>
+      <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span></div>
       <div class="row transport">
         <button data-a="cue">CUE</button><button data-a="play">▶ / ❚❚</button>
         <button data-a="back">−10秒</button><button data-a="fwd">+10秒</button>
@@ -147,7 +147,7 @@ class Deck {
     this.ui = {
       bar: $('.bar', this.el), fill: $('.fill', this.el), ph: $('.ph', this.el),
       marks: $('.marks', this.el), loopz: $('.loopz', this.el), cur: $('.cur', this.el), dur: $('.dur', this.el),
-      remain: $('.remain', this.el), snd: $('.snd', this.el), rate: $('.rate', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
+      remain: $('.remain', this.el), snd: $('.snd', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
       pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el),
     };
@@ -461,8 +461,6 @@ class Deck {
     this.ui.fill.style.width = pct + '%'; this.ui.ph.style.left = pct + '%';
     this.ui.cur.textContent = fmt(cur); this.ui.dur.textContent = fmt(this.dur);
     this.ui.remain.textContent = this.dur ? `残り ${fmt(this.dur - cur)}` : '';
-    const want = this.wantRate, act = this.rateActual || 1;
-    this.ui.rate.textContent = Math.abs(want - act) > 0.004 ? `×${act.toFixed(2)}（指定 ${want.toFixed(3)}）` : `×${act.toFixed(3)}`;
     let snd = '';
     if (this.videoId && this.ready && !this.priming) {
       let muted = false; try { muted = this.player.isMuted(); } catch (e) { }
