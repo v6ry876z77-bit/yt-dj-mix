@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10n';
+const APP_VERSION = '2026-10-10o';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -658,7 +658,6 @@ function takeUrlInput() {
   $('#urlIn').value = ''; return id;
 }
 $$('[data-load]').forEach(b => b.addEventListener('click', () => { const id = takeUrlInput(); if (id) deckOf(b.dataset.load).load(id); }));
-$('#btnAddHist').addEventListener('click', () => { const id = takeUrlInput(); if (id) { addHistory(id, ''); histSel = 0; renderHist(); toast('履歴に追加しました'); } });
 let clipOffer = null;
 function offerClip(id) {
   clipOffer = { id };
