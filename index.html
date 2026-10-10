@@ -31,8 +31,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(
 .vid iframe,.vid>div{position:absolute;inset:0;width:100%;height:100%}
 .vid .shield{z-index:2;background:transparent;touch-action:manipulation}
 body.smallvid .vid{width:min(100%,356px);align-self:center}
-.vid.big{position:fixed;left:0;top:0;width:100vw!important;height:min(82vh,56.25vw);aspect-ratio:auto;z-index:40;border-radius:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.75)}
-.vid .unbig{display:none;position:absolute;right:10px;top:10px;z-index:3;font-size:18px;padding:10px 16px;background:rgba(0,0,0,.7)}
+.vid.vid .unbig{display:none;position:absolute;right:10px;top:10px;z-index:3;font-size:18px;padding:10px 16px;background:rgba(0,0,0,.7)}
 .vid.big .unbig{display:block}
 .cc>button{padding:5px 6px;font-size:13px}
 .lc{display:flex;flex-direction:column;gap:7px}
@@ -103,9 +102,6 @@ body.smallvid .pads button{padding:20px 4px}
 .seg>button{padding:6px}
 .seg>button.on{background:#2d3b52;border-color:var(--a);color:var(--text)}
 .hint{color:var(--dim);font-size:12px}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;max-width:560px;width:100%}
-.card h2{margin-top:0}
 .big{font-size:20px;padding:14px 22px;background:var(--ok);color:#000;border:none;font-weight:800}
 dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:0;width:min(900px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
 dialog::backdrop{background:rgba(0,0,0,.7)}
@@ -128,14 +124,6 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 </style>
 </head>
 <body>
-<div id="start" class="overlay">
-  <div class="card">
-    <h2>YT DJ Mix</h2>
-    <p>YouTube を2デッキで再生し、Hercules DJControl Mix Ultra などの MIDI コントローラーで操作します。</p>
-    <p class="hint">コントローラーは USB-C（OTG）で接続するのが確実です。Bluetooth の場合は先に Android 側で BLE-MIDI 接続を済ませてください。</p>
-    <button id="startBtn" class="big">タップして開始</button>
-  </div>
-</div>
 
 <header>
   <h1>YT DJ Mix</h1>
@@ -214,7 +202,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-04c"></script>
+<script src="app.js?v=2026-10-10a"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

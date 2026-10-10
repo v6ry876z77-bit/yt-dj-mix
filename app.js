@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-04c';
+const APP_VERSION = '2026-10-10a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -645,7 +645,7 @@ async function checkClipboard(manual = false) {
 $('#btnClip').addEventListener('click', () => checkClipboard(true));
 let clipCheckAt = 0;
 function autoClip() {
-  if (!started || document.visibilityState !== 'visible') return;
+  if (document.visibilityState !== 'visible') return;
   const t = Date.now(); if (t - clipCheckAt < 800) return; clipCheckAt = t;
   setTimeout(() => checkClipboard(false), 300);
 }
@@ -894,21 +894,21 @@ $('#wizard').addEventListener('cancel', () => wizEnd(false));
 
 /* ---------- 開始・画面 ---------- */
 let wakeLock = null;
-let started = false;
 async function keepAwake() {
   try { if ('wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { }
 }
 document.addEventListener('visibilitychange', keepAwake);
-$('#startBtn').addEventListener('click', () => {
-  $('#start').style.display = 'none';
-  started = true;
-  initMidi(); keepAwake();
-  // 開始タップ前に読み込んだ曲は、タップ後に改めて準備し直す
+// 開始画面は使わず、起動と同時に MIDI 接続・画面スリープ防止を行う
+initMidi(); keepAwake();
+if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
+// 自動再生が許可されず準備できなかった曲は、最初に画面を触った時に準備し直す
+document.addEventListener('pointerdown', () => {
+  keepAwake();
+  if (!window.YT) return;
   for (const d of decks) {
     if (d.ready && d.videoId && (d.priming || d.state === YT.PlayerState.UNSTARTED || d.state === YT.PlayerState.CUED)) d.load(d.videoId, d.priming ? d.primeAt : d.now(), true);
   }
-  if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
-});
+}, { once: true, capture: true });
 const BMODE_LABEL = { hide: 'B: 隠す', mini: 'B: 小', normal: 'B: 通常' };
 function applyVideoSize() {
   document.body.classList.toggle('smallvid', !!S.settings.smallVideo);
