@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10k';
+const APP_VERSION = '2026-10-10l';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -142,7 +142,7 @@ class Deck {
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
       <div class="lc"><div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
       <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button></div></div>
-      <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span><button data-a="pitchReset" style="padding:4px 8px">0</button></div>
+      <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
     this.ui = {
       bar: $('.bar', this.el), fill: $('.fill', this.el), ph: $('.ph', this.el),
@@ -160,8 +160,6 @@ class Deck {
         b.addEventListener('pointercancel', () => this.cueUp());
       } else if (a === 'cc' || a === 'ccMinus' || a === 'ccPlus') {
         b.addEventListener('click', () => this.view(a));
-      } else if (a === 'pitchReset') {
-        b.addEventListener('click', () => this.setPitch(0));
       } else {
         b.addEventListener('click', () => this.button(a, true));
       }
@@ -260,7 +258,7 @@ class Deck {
     }
     return this.base;
   }
-  get playing() { return !this.softPaused && (this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING); }
+  get playing() { return !!window.YT && !this.softPaused && (this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING); } // YouTube の読み込み前は false
   /* 止める: seekTo(t, false) はシークバーを掴んだ状態になり、映像がその位置で止まる。このときロゴ等の表示が出ない */
   pauseSoft(t = this.now()) {
     this.softPaused = true; this.softT = t; this.base = t;
@@ -702,8 +700,17 @@ function handleShared(params) {
   const id = parseYouTubeId(text); if (!id) return false;
   let title = params.get('title') || '';
   if (/youtu/.test(title)) title = '';
-  addHistory(id, title); histSel = 0; renderHist();
-  toast('共有された動画を履歴の先頭に追加しました。A / B を押して読み込めます', 4000);
+  // デッキA に読み込む（再生中に曲が替わると困るので、そのときは履歴に入れるだけ）
+  const A = deckOf('A');
+  if (A.playing) {
+    const old = S.hist.findIndex(h => h.id === id);
+    if (old >= 0) { title = title || S.hist[old].title; S.hist.splice(old, 1); } // 既にあれば先頭へ移す
+    addHistory(id, title); histSel = 0; setListMode('hist'); renderHist();
+    toast('デッキA が再生中なので、共有された動画は履歴の先頭に入れました（A を押すと読み込みます）', 4000);
+  } else {
+    loadInto(A, { id, title });
+    toast('共有された動画をデッキA に読み込みました', 2500);
+  }
   return true;
 }
 if (handleShared(new URLSearchParams(location.search))) history.replaceState(null, '', location.pathname);
