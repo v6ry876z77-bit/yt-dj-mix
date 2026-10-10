@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10h';
+const APP_VERSION = '2026-10-10i';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -116,7 +116,7 @@ class Deck {
     this.lastVolSent = -1; this.lastMuteCheck = 0;
     // 一時停止は「その位置で映像を止める」方式（本当の一時停止だとロゴや「その他の動画」が出て字幕が隠れるため）
     this.softPaused = false; this.softT = 0;
-    this.freezeTimer = null; this.lastChromeAt = 0; // lastChromeAt: YouTube のバーが最後に出た時刻（再生開始・シーク）
+    this.lastChromeAt = 0; // lastChromeAt: YouTube のバーが最後に出た時刻（再生開始・シーク）
     const saved = S.decks[name];
     if (saved) {
       this.videoId = saved.videoId || ''; this.title = saved.title || '';
@@ -207,7 +207,6 @@ class Deck {
     }
     if (!this.ready) { this.videoId = id; this.restorePos = start; return; }
     this.videoId = id; this.dur = 0; this.appliedRate = null; this.softPaused = false;
-    clearTimeout(this.freezeTimer); this.freezeTimer = null;
     this.base = start; this.stamp = performance.now(); this.lastRaw = -1;
     // 先頭を読み込ませてから一時停止しておく（すぐに再生できるように）。この間は消音。
     this.priming = true; this.primeAt = start; this.primeStarted = performance.now();
@@ -263,22 +262,19 @@ class Deck {
   get playing() { return !this.softPaused && (this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING); }
   /* 止める: seekTo(t, false) はシークバーを掴んだ状態になり、映像がその位置で止まる。このときロゴ等の表示が出ない */
   pauseSoft(t = this.now()) {
-    clearTimeout(this.freezeTimer); this.freezeTimer = null;
     this.softPaused = true; this.softT = t; this.base = t;
     this.applyVolume(true); // 音はすぐ消す
-    // バーが出ている最中に止めるとバーが残るので、消えるまで（約4秒）待ってから止める
-    const wait = this.lastChromeAt + 4000 - performance.now();
-    if (wait > 50) this.freezeTimer = setTimeout(() => this.freezeNow(), wait);
-    else this.freezeNow();
+    this.freezeAt(t);
   }
-  freezeNow() {
-    this.freezeTimer = null;
-    if (this.softPaused) this.player.seekTo(this.softT, false);
+  /* その位置で映像を止める。YouTube のバーが出ている最中に止めるとバーが残るので、その場合は
+     「再生中扱い」にしてバーを自動で消させる（このとき 0.25 秒ほどの映像が無音で繰り返される） */
+  freezeAt(t) {
+    this.player.seekTo(t, false);
+    if (performance.now() - this.lastChromeAt < 4000) this.player.playVideo();
   }
   /* 再開: 止めた位置へ通常のシークをしてから再生（playVideo だけだと止まったまま） */
   resume() {
     if (needTouchHint()) return;
-    clearTimeout(this.freezeTimer); this.freezeTimer = null;
     this.player.unMute();
     if (this.softPaused) {
       this.softPaused = false; this.applyVolume(true);
@@ -291,9 +287,9 @@ class Deck {
     if (!this.ready || !this.videoId) return;
     t = Math.max(0, this.dur ? Math.min(t, this.dur - 0.05) : t);
     if (this.priming) { this.primeAt = t; this.base = t; return; }
-    if (this.softPaused) { // 止めたまま位置だけ動かす（止める処理が予約中なら、その位置で止まる）
+    if (this.softPaused) { // 止めたまま位置だけ動かす
       this.softT = t; this.base = t;
-      if (!this.freezeTimer) this.player.seekTo(t, false);
+      this.freezeAt(t);
       return;
     }
     if (this.state === YT.PlayerState.CUED || this.state === YT.PlayerState.UNSTARTED) {
