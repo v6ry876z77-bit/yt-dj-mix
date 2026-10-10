@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10a';
+const APP_VERSION = '2026-10-10b';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -118,7 +118,7 @@ class Deck {
   buildUI() {
     const n = this.name;
     this.el.innerHTML = `
-      <div class="vid"><div id="player${n}"></div><div class="shield"></div><button class="unbig" data-a="big">✕ 元に戻す</button></div>
+      <div class="vid"><div id="player${n}"></div><div class="shield"></div></div>
       <div class="dtitle"><span class="tag">${n}</span><span class="tt">未ロード</span></div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span><span class="rate">×1.00</span></div>
@@ -128,7 +128,7 @@ class Deck {
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
       <div class="lc"><div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
-      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button><button data-a="big">⛶ 大画面</button></div></div>
+      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button></div></div>
       <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span><button data-a="pitchReset" style="padding:4px 8px">0</button></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
     this.ui = {
@@ -145,7 +145,7 @@ class Deck {
         b.addEventListener('pointerdown', e => { e.preventDefault(); this.cueDown(); });
         b.addEventListener('pointerup', () => this.cueUp());
         b.addEventListener('pointercancel', () => this.cueUp());
-      } else if (a === 'cc' || a === 'ccMinus' || a === 'ccPlus' || a === 'big') {
+      } else if (a === 'cc' || a === 'ccMinus' || a === 'ccPlus') {
         b.addEventListener('click', () => this.view(a));
       } else if (a === 'pitchReset') {
         b.addEventListener('click', () => this.setPitch(0));
@@ -218,7 +218,10 @@ class Deck {
       if (vd && vd.title && vd.title !== this.title) { this.title = vd.title; addHistory(this.videoId, this.title); this.renderStatic(); save(); }
     }
     if (s === YT.PlayerState.PLAYING) this.appliedRate = null; // 再生開始時にテンポを確実に反映
-    if (s === YT.PlayerState.PLAYING && S.settings.cc[this.name] && this.ccFor !== this.videoId) this.applyCaptions();
+    if (s === YT.PlayerState.PLAYING && this.ccFor !== this.videoId) {
+      if (S.settings.cc[this.name]) this.applyCaptions();
+      else { this.ccFor = this.videoId; try { this.player.unloadModule('captions'); } catch (e) { } }
+    }
     refreshLeds();
   }
   onError(code) {
@@ -305,16 +308,13 @@ class Deck {
   /* --- 字幕（YouTube プレーヤーの字幕を大きく表示） --- */
   view(a) {
     const cc = S.settings.cc;
-    if (a === 'big') {
-      const on = !this.ui.vid.classList.contains('big');
-      for (const d of decks) d.ui.vid.classList.remove('big');
-      this.ui.vid.classList.toggle('big', on);
-    } else if (a === 'cc') {
+    if (a === 'cc') {
       cc[this.name] = !cc[this.name];
       if (cc[this.name]) this.applyCaptions(); else { this.ccFor = null; try { this.player.unloadModule('captions'); } catch (e) { } }
     } else {
       S.settings.ccSize = Math.max(-1, Math.min(4, S.settings.ccSize + (a === 'ccPlus' ? 1 : -1)));
-      for (const d of decks) if (cc[d.name]) d.setCaptionSize();
+      if (!cc[this.name]) { cc[this.name] = true; this.applyCaptions(); }
+      for (const d of decks) d.setCaptionSize();
       toast(`字幕の大きさ: ${S.settings.ccSize + 2} / 6`, 1200);
     }
     this.renderCc(); save();
@@ -935,7 +935,6 @@ setInterval(() => { const t = performance.now(); for (const d of decks) d.tick(t
 setInterval(() => { for (const d of decks) d.renderLive(); }, 100);
 setInterval(save, 3000);
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') for (const d of decks) d.ui.vid.classList.remove('big'); });
 renderHist(); renderSrch(); updateSearchPlaceholder();
 decks.forEach(d => d.renderCc());
 decks.forEach(d => d.setPitch(0));
