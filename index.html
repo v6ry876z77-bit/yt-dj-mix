@@ -37,7 +37,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(
 body.bhide .deck[data-deck=B]{display:none}
 @media (min-width:761px){
   body.bhide main{grid-template-columns:minmax(0,1fr) minmax(190px,230px);align-items:start}
-  body.bhide .deck[data-deck=A] .vid{width:min(100%,calc((100vh - 293px) * 16 / 9));align-self:center}
+  body.bhide .deck[data-deck=A] .vid{width:min(100% - 60px,calc((100vh - 260px) * 16 / 9))}
   body.bhide .deck[data-deck=A] .lc{flex-direction:row}
 }
 body.bhide .deck[data-deck=A] .pads{grid-template-columns:repeat(8,minmax(0,1fr))}
@@ -45,12 +45,15 @@ body.bhide .deck[data-deck=A] .hint{display:none}
 /* デッキB を小さく表示（動画は YouTube の最小サイズ 356×200 を確保） */
 @media (min-width:761px){
   body.bmini main{grid-template-columns:minmax(0,1fr) minmax(190px,220px) 372px;align-items:start}
-  body.bmini .deck[data-deck=A] .vid{width:min(100%,calc((100vh - 400px) * 16 / 9));align-self:center}
+  body.bmini .deck[data-deck=A] .vid{width:min(100% - 60px,calc((100vh - 367px) * 16 / 9))}
   body.bmini .deck[data-deck=A] .hint{display:none}
 }
 body.bmini .deck[data-deck=B] .pads,body.bmini .deck[data-deck=B] .loops,body.bmini .deck[data-deck=B] .cc{display:none}
 body.bmini .deck[data-deck=B]{padding:6px;gap:5px;font-size:13px}
-body.bmini .deck[data-deck=B] .vid{width:min(100%,356px);align-self:center}
+body.bmini .deck[data-deck=B] .vidrow{flex-direction:column-reverse;align-items:center}
+body.bmini .deck[data-deck=B] .vid{width:min(100%,356px)}
+body.bmini .deck[data-deck=B] .pitch{flex-direction:row;flex:0 0 auto;width:100%}
+body.bmini .deck[data-deck=B] .pitch input{writing-mode:horizontal-tb;direction:ltr;width:auto;min-height:0}
 body.bmini .deck[data-deck=B] button{padding:6px 4px;font-size:13px;min-width:0}
 body.bmini .deck[data-deck=B] .transport button,body.bmini .deck[data-deck=B] .pads button{padding:8px 4px}
 body.bmini .deck[data-deck=B] .bar{height:10px}
@@ -69,9 +72,12 @@ body.bmini .deck[data-deck=B] .hint{display:none}
 .pads{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .pads button{background:var(--pad);padding:7px 4px;font-weight:700}
 .pads button.set{background:#6b3fa0;border-color:#c77dff}
-.pitch{display:flex;align-items:center;gap:8px}
-.pitch input{flex:1}
-.pitch span{min-width:4.5em;text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
+.vidrow{display:flex;gap:6px;align-items:stretch;justify-content:center;min-width:0}
+.vidrow .vid{width:calc(100% - 60px);flex:0 1 auto}
+/* テンポは動画の左に縦向き（上が速い） */
+.pitch{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 54px;font-size:12px}
+.pitch input{flex:1;writing-mode:vertical-lr;direction:rtl;width:30px;min-height:100px}
+.pitch span{font-variant-numeric:tabular-nums;color:var(--dim);text-align:center}
 .mixer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .vols{display:flex;justify-content:space-around;align-items:flex-end;gap:10px}
 .vols label{display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:700}
@@ -192,7 +198,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-10m"></script>
+<script src="app.js?v=2026-10-10n"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
