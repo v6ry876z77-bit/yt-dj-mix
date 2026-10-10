@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10g';
+const APP_VERSION = '2026-10-10h';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -115,7 +115,7 @@ class Deck {
     this.cuePreview = false; this.playLatch = false;
     this.lastVolSent = -1; this.lastMuteCheck = 0;
     // 一時停止は「その位置で映像を止める」方式（本当の一時停止だとロゴや「その他の動画」が出て字幕が隠れるため）
-    this.softPaused = false; this.softT = 0; this.ccDragTimer = null;
+    this.softPaused = false; this.softT = 0;
     this.freezeTimer = null; this.lastChromeAt = 0; // lastChromeAt: YouTube のバーが最後に出た時刻（再生開始・シーク）
     const saved = S.decks[name];
     if (saved) {
@@ -140,7 +140,7 @@ class Deck {
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
       <div class="lc"><div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
-      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button><button data-a="ccDrag">字幕の位置</button></div></div>
+      <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button></div></div>
       <div class="pitch"><span style="text-align:left;min-width:auto">テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span><button data-a="pitchReset" style="padding:4px 8px">0</button></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
     this.ui = {
@@ -149,7 +149,6 @@ class Deck {
       remain: $('.remain', this.el), snd: $('.snd', this.el), rate: $('.rate', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
       pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el),
-      ccDrag: $('[data-a=ccDrag]', this.el), shield: $('.shield', this.el),
     };
     // ボタン（CUE は押している間だけプレビューするので pointerdown/up を使う）
     for (const b of $$('[data-a]', this.el)) {
@@ -158,7 +157,7 @@ class Deck {
         b.addEventListener('pointerdown', e => { e.preventDefault(); this.cueDown(); });
         b.addEventListener('pointerup', () => this.cueUp());
         b.addEventListener('pointercancel', () => this.cueUp());
-      } else if (a === 'cc' || a === 'ccMinus' || a === 'ccPlus' || a === 'ccDrag') {
+      } else if (a === 'cc' || a === 'ccMinus' || a === 'ccPlus') {
         b.addEventListener('click', () => this.view(a));
       } else if (a === 'pitchReset') {
         b.addEventListener('click', () => this.setPitch(0));
@@ -361,17 +360,6 @@ class Deck {
   /* --- 字幕（YouTube プレーヤーの字幕を大きく表示） --- */
   view(a) {
     const cc = S.settings.cc;
-    if (a === 'ccDrag') {
-      const on = this.ui.shield.style.display !== 'none';
-      clearTimeout(this.ccDragTimer);
-      const off = () => { this.ui.shield.style.display = ''; this.ui.ccDrag.classList.remove('on'); };
-      if (on) {
-        this.ui.shield.style.display = 'none'; this.ui.ccDrag.classList.add('on');
-        toast('30秒間、字幕を指で上へドラッグしてみてください（もう一度押すと終了）', 4000);
-        this.ccDragTimer = setTimeout(off, 30000);
-      } else off();
-      return;
-    }
     if (a === 'cc') {
       cc[this.name] = !cc[this.name];
       if (cc[this.name]) this.applyCaptions(); else { this.ccFor = null; try { this.player.unloadModule('captions'); } catch (e) { } }
