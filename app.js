@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-10b';
+const APP_VERSION = '2026-10-10c';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -118,8 +118,8 @@ class Deck {
   buildUI() {
     const n = this.name;
     this.el.innerHTML = `
-      <div class="vid"><div id="player${n}"></div><div class="shield"></div></div>
       <div class="dtitle"><span class="tag">${n}</span><span class="tt">未ロード</span></div>
+      <div class="vid"><div id="player${n}"></div><div class="shield"></div></div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span><span class="rate">×1.00</span></div>
       <div class="row transport">
