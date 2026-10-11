@@ -94,7 +94,10 @@ body.bmini .deck[data-deck=B] .hint{display:none}
 .hist li button{padding:4px 8px;font-size:13px}
 .hist li img{width:64px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;flex:0 0 auto;background:#000}
 .hist li .sub{display:block;color:var(--dim);font-size:11px}
-.hist li .tt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hist li .tt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;line-height:1.3}
+#chan li img,#srch li img{width:56px}
+/* デッキB を隠しているときは一覧の「B」ボタンも隠して、タイトルを広く見せる */
+body.bhide .hist li button[data-to=B]{display:none}
 .hist li.more{justify-content:center}
 .seg>button{padding:6px 2px;font-size:12px;min-width:0}
 .seg>button.on{background:#2d3b52;border-color:var(--a);color:var(--text)}
@@ -148,9 +151,9 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
       <span class="hint">YouTube で見つけた動画は「共有」→「YT DJ」、または「共有」→「コピー」してからこの画面に戻ると読み込めます。</span>
     </div>
     <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="検索 または URL" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button></form>
-    <div class="row seg"><button id="segS">検索結果</button><button id="segH" class="on">履歴</button><button id="segC">チャンネル</button></div>
+    <div class="row seg"><button id="segS">検索結果</button><button id="segH">履歴</button><button id="segC" class="on">チャンネル</button></div>
     <ul id="srch" class="hist" hidden></ul>
-    <ul id="hist" class="hist"></ul>
+    <ul id="hist" class="hist" hidden></ul>
     <div id="chanPane" hidden>
       <div class="row" style="flex-wrap:nowrap;margin-bottom:6px"><input id="chIn" placeholder="チャンネルID（UC…）" style="flex:1"><button id="chAdd" style="flex:0 0 auto">追加</button></div>
       <ul id="chan" class="hist"></ul>
@@ -203,7 +206,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-11c"></script>
+<script src="app.js?v=2026-10-11d"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

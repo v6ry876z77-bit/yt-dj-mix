@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-11c';
+const APP_VERSION = '2026-10-11d';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -119,7 +119,7 @@ class Deck {
     this.state = -1; this.dur = 0;
     this.lastRaw = -1; this.base = 0; this.stamp = 0;
     this.jogAcc = 0; this.lastJog = 0;
-    this.priming = false; this.primeAt = 0;
+    this.priming = false; this.primeAt = 0; this.primeTimer = null;
     this.cuePreview = false; this.playLatch = false;
     this.lastVolSent = -1; this.lastMuteCheck = 0;
     // 一時停止は「その位置で映像を止める」方式（本当の一時停止だとロゴや「その他の動画」が出て字幕が隠れるため）
@@ -216,7 +216,8 @@ class Deck {
     if (!this.ready) { this.videoId = id; this.restorePos = start; return; }
     this.videoId = id; this.dur = 0; this.appliedRate = null; this.softPaused = false;
     this.base = start; this.stamp = performance.now(); this.lastRaw = -1;
-    // 先頭を読み込ませてから一時停止しておく（すぐに再生できるように）。この間は消音。
+    // 先頭を読み込ませてから止めておく（すぐに再生できるように）。この間は消音。
+    clearTimeout(this.primeTimer); this.primeTimer = null;
     this.priming = true; this.primeAt = start; this.primeStarted = performance.now();
     this.player.mute();
     this.player.loadVideoById({ videoId: id, startSeconds: start });
@@ -227,10 +228,12 @@ class Deck {
     this.state = s;
     if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.BUFFERING) this.lastChromeAt = performance.now();
     if (this.priming && s === YT.PlayerState.PLAYING) {
-      this.player.pauseVideo(); this.player.seekTo(this.primeAt, true);
+      // 再生が始まった直後は YouTube のバーが出ているので、消えるのを待ってから止める
+      if (!this.primeTimer) this.primeTimer = setTimeout(() => this.primeCheck(), 4000);
       return;
     }
-    if (this.priming && (s === YT.PlayerState.PAUSED || s === YT.PlayerState.CUED)) {
+    if (this.priming && s === YT.PlayerState.CUED) { // 自動再生できず頭出しだけされた場合
+      clearTimeout(this.primeTimer); this.primeTimer = null;
       this.priming = false; this.player.unMute(); this.applyVolume(true);
     }
     if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.PAUSED || s === YT.PlayerState.CUED) {
@@ -267,7 +270,23 @@ class Deck {
     }
     return this.base;
   }
-  get playing() { return !!window.YT && !this.softPaused && (this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING); } // YouTube の読み込み前は false
+  primeCheck() {
+    this.primeTimer = null;
+    if (!this.priming) return;
+    const wait = this.lastChromeAt + 4000 - performance.now();
+    if (wait > 50) { this.primeTimer = setTimeout(() => this.primeCheck(), wait); return; }
+    this.finishPrime();
+  }
+  /* 準備完了: 頭（primeAt）に戻してその場で止める。再開は resume()（止めた位置から再生） */
+  finishPrime() {
+    clearTimeout(this.primeTimer); this.primeTimer = null;
+    if (!this.priming) return;
+    this.priming = false;
+    this.softPaused = true; this.softT = this.primeAt; this.base = this.primeAt;
+    this.freezeAt(this.primeAt);
+    this.player.unMute(); this.applyVolume(true);
+  }
+  get playing() { return !!window.YT && !this.priming && !this.softPaused && (this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING); } // YouTube の読み込み前は false
   /* 止める: seekTo(t, false) はシークバーを掴んだ状態になり、映像がその位置で止まる。このときロゴ等の表示が出ない */
   pauseSoft(t = this.now()) {
     this.softPaused = true; this.softT = t; this.base = t;
@@ -284,6 +303,10 @@ class Deck {
   /* 再開: 止めた位置へ通常のシークをしてから再生（playVideo だけだと止まったまま） */
   resume() {
     if (needTouchHint()) return;
+    if (this.priming) {
+      clearTimeout(this.primeTimer); this.primeTimer = null;
+      this.priming = false; this.softPaused = true; this.softT = this.primeAt;
+    }
     this.player.unMute();
     if (this.softPaused) {
       this.softPaused = false; this.applyVolume(true);
@@ -425,7 +448,7 @@ class Deck {
       this.player.cueVideoById({ videoId: this.videoId, startSeconds: this.primeAt });
       this.base = this.primeAt; return;
     }
-    if (this.priming && t - this.primeStarted > 15000) { this.priming = false; this.player.unMute(); this.applyVolume(true); }
+    if (this.priming && t - this.primeStarted > 15000) this.finishPrime();
     if (!this.priming && t - this.lastMuteCheck > 500) {
       this.lastMuteCheck = t;
       try { if (this.player.isMuted()) { this.player.unMute(); this.applyVolume(true); } } catch (e) { }
@@ -1177,6 +1200,7 @@ setInterval(() => { for (const d of decks) d.renderLive(); }, 100);
 setInterval(save, 3000);
 
 renderHist(); renderSrch(); updateSearchPlaceholder();
+setListMode('chan'); renderChan();
 decks.forEach(d => d.renderCc());
 decks.forEach(d => d.setPitch(0));
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
