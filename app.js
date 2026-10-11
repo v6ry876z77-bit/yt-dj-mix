@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-11a';
+const APP_VERSION = '2026-10-11c';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -59,6 +59,12 @@ try {
 // 起動時は字幕をオンにする（途中でオフにしても、次に開いたときはまたオン）
 S.settings.cc = { A: true, B: true };
 delete S.settings.smallVideo; // 廃止した「動画: 大／小」の設定を消す
+// ユーザーに頼まれたお気に入りチャンネルを一度だけ登録しておく（消したあとに勝手に戻らないよう印を残す）
+if (!S.seedCh1) {
+  for (const id of ['UC8-Th83bH_thdKZDJCrn88g', 'UCa6vGFO9ty8v5KZJXQxdhaw'])
+    if (!S.channels.some(c => c.id === id)) S.channels.push({ id, name: '', seen: '' });
+  S.seedCh1 = 1;
+}
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
@@ -243,7 +249,7 @@ class Deck {
     this.priming = false; try { this.player.unMute(); } catch (e) { }
     const msg = {
       2: 'URL が正しくありません', 5: 'この端末で再生できない動画です', 100: '動画が見つかりません（削除・非公開）',
-      101: 'この動画は埋め込み再生が禁止されています', 150: 'この動画は埋め込み再生が禁止されています',
+      101: 'この動画は埋め込み再生が禁止されているか、日本では見られない動画です', 150: 'この動画は埋め込み再生が禁止されているか、日本では見られない動画です',
       153: 'YouTube が再生を拒否しました（ファイルを直接開いている場合は https で開いてください）',
     }[code] || `再生エラー (${code})`;
     toast(`デッキ${this.name}: ${msg}`, 4000);
@@ -562,9 +568,9 @@ const chan = { sel: null, items: [], shown: 25, itemSel: 0, listSel: 0, vids: {}
 const titleCache = {};
 let helperQ = Promise.resolve();
 // 1チャンネルごとに使い捨てのプレーヤーを作って一覧を取り出す（使い回すと前の一覧が混ざるため）
-function fetchUploads(chId) {
-  const job = helperQ.then(() => new Promise(res => {
-    if (!window.YT || !YT.Player) { res(null); return; }
+// 先頭の動画が日本で見られない等で再生エラーになると一覧も取れないので、開始位置をずらして取り直す
+function uploadsAttempt(chId, index) {
+  return new Promise(res => {
     const div = document.createElement('div');
     div.style.cssText = 'position:fixed;left:-400px;top:0;width:200px;height:200px;pointer-events:none';
     const inner = document.createElement('div'); div.appendChild(inner); document.body.appendChild(div);
@@ -573,13 +579,26 @@ function fetchUploads(chId) {
       if (done) return; done = true; clearInterval(poll); clearTimeout(tm);
       try { p && p.destroy(); } catch (e) { } div.remove(); res(v);
     };
-    const tm = setTimeout(() => finish(null), 10000);
+    const tm = setTimeout(() => finish(null), 8000);
     p = new YT.Player(inner, {
       width: '200', height: '200',
-      playerVars: { listType: 'playlist', list: 'UU' + chId.slice(2), controls: 0, hl: 'en' },
-      events: { onReady: () => { poll = setInterval(() => { const l = p.getPlaylist(); if (l && l.length) finish(l.slice()); }, 300); } },
+      playerVars: { listType: 'playlist', list: 'UU' + chId.slice(2), index, controls: 0, hl: 'en' },
+      events: {
+        onReady: () => { poll = setInterval(() => { const l = p.getPlaylist(); if (l && l.length) finish(l.slice()); }, 300); },
+        onError: () => setTimeout(() => finish((p.getPlaylist() || []).slice() || null), 300),
+      },
     });
-  }));
+  });
+}
+function fetchUploads(chId) {
+  const job = helperQ.then(async () => {
+    if (!window.YT || !YT.Player) return null;
+    for (const index of [0, 5, 12, 25, 50]) {
+      const l = await uploadsAttempt(chId, index);
+      if (l && l.length) return l;
+    }
+    return null;
+  });
   helperQ = job.catch(() => null);
   return job;
 }
