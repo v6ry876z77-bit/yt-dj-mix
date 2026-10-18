@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-11d';
+const APP_VERSION = '2026-10-18a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -25,6 +25,7 @@ for (const d of DECK_NAMES) {
   addT(`${d}.volume`, `デッキ${d} 音量フェーダー`, 'abs');
   addT(`${d}.pitch`, `デッキ${d} ピッチ（テンポ）フェーダー`, 'abs');
   addT(`${d}.jog`, `デッキ${d} ジョグホイール`, 'rel', 'ジョグの天面をゆっくり回してください（2回目は側面。同じ信号なら自動で先へ進みます）');
+  addT(`${d}.jogFast`, `デッキ${d} ジョグ（SHIFT を押しながら回したとき）`, 'rel', 'SHIFT を押したままジョグを回してください（ふだんと同じ信号なら、この項目はスキップで構いません）');
   for (let i = 1; i <= NCUES; i++) addT(`${d}.hc${i}`, `デッキ${d} パッド${i}（ホットキュー）`, 'button');
   addT(`${d}.loopIn`, `デッキ${d} ループ IN`, 'button');
   addT(`${d}.loopOut`, `デッキ${d} ループ OUT／解除`, 'button');
@@ -44,7 +45,7 @@ for (const t of TARGETS) {
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
-  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, led: true, ytKey: '', bMode: 'hide', cc: { A: true, B: true }, ccSize: 3 },
+  settings: { pitchRange: 0.5, pitchInvert: false, jogSens: 0.02, jogFastMul: 10, led: true, ytKey: '', bMode: 'hide', cc: { A: true, B: true }, ccSize: 3 },
   decks: {},             // A: {videoId,title,cue,hc,pos}
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
@@ -458,7 +459,7 @@ class Deck {
     // ジョグ（まとめて適用）
     const iv = this.playing ? 150 : 70;
     if (this.jogAcc && t - this.lastJog > iv) {
-      const d = this.jogAcc * S.settings.jogSens * (shiftHeld ? 10 : 1);
+      const d = this.jogAcc * S.settings.jogSens;
       this.jogAcc = 0; this.lastJog = t; this.seek(cur + d);
     }
     // テンポ
@@ -996,7 +997,8 @@ function dispatch(b, val) {
     else if (act === 'pitch') deck.setPitch((S.settings.pitchInvert ? 0.5 - v : v - 0.5) * 2);
   } else {
     const d = b.rel === 'offset' ? val - 64 : (val < 64 ? val : val - 128);
-    if (act === 'jog') deck.jog(d);
+    if (act === 'jog') deck.jog(d * (shiftHeld ? S.settings.jogFastMul : 1));
+    else if (act === 'jogFast') deck.jog(d * S.settings.jogFastMul);
     else if (act === 'browse') browse(d);
   }
 }
@@ -1093,6 +1095,7 @@ function openSettings() {
   $('#optRange').value = String(S.settings.pitchRange);
   $('#optInvert').checked = S.settings.pitchInvert;
   $('#optJog').value = S.settings.jogSens;
+  $('#optJogFast').value = String(S.settings.jogFastMul);
   $('#optLed').checked = S.settings.led;
   $('#optKey').value = S.settings.ytKey || '';
   $('#optBMode').value = S.settings.bMode;
@@ -1105,6 +1108,7 @@ $('#settings').addEventListener('close', cancelLearn);
 $('#optRange').addEventListener('change', e => { S.settings.pitchRange = +e.target.value; decks.forEach(d => d.setPitch(d.pitch)); save(); });
 $('#optInvert').addEventListener('change', e => { S.settings.pitchInvert = e.target.checked; save(); });
 $('#optJog').addEventListener('change', e => { const v = +e.target.value; if (v > 0) { S.settings.jogSens = v; save(); } });
+$('#optJogFast').addEventListener('change', e => { S.settings.jogFastMul = +e.target.value; save(); });
 $('#optLed').addEventListener('change', e => { S.settings.led = e.target.checked; save(); refreshLeds(); });
 $('#optBMode').addEventListener('change', e => { S.settings.bMode = e.target.value; applyVideoSize(); save(); });
 $('#optKey').addEventListener('change', e => { S.settings.ytKey = e.target.value.trim(); save(); if (S.settings.ytKey) toast('API キーを保存しました'); updateSearchPlaceholder(); });
