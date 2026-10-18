@@ -120,6 +120,20 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 #clipBar .ct{font-weight:600;margin-bottom:8px}
 #clipBar .row>button{min-width:64px}
 #tapHint{background:#5a4a00;color:#fff;text-align:center;padding:6px 12px;font-weight:700;cursor:pointer}
+/* 登録チャンネルの動画一覧（デッキA の下） */
+#chanGrid{padding:4px 10px 24px}
+#chanGrid .gh{display:flex;gap:8px;align-items:center;margin:4px 0 10px;flex-wrap:wrap}
+#chanGrid .gh b{font-size:17px;margin-right:auto}
+#cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.vcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+.vcard.sel{outline:3px solid var(--a)}
+.vcard img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000}
+.vcard .new{color:var(--ok);font-weight:800;font-size:12px;padding:4px 8px 0}
+.vcard .new:empty{display:none}
+.vcard .ct{padding:6px 8px;font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;flex:1}
+.vcard .cb{display:flex;gap:6px;padding:0 8px 8px}
+.vcard .cb button{flex:1;padding:6px}
+body.bhide .vcard button[data-to=B]{display:none}
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000;border:1px solid var(--line);padding:10px 16px;border-radius:10px;z-index:60;display:none;max-width:calc(100vw - 32px)}
 </style>
 </head>
@@ -161,6 +175,11 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
   </section>
   <section class="deck" data-deck="B"></section>
 </main>
+<section id="chanGrid" hidden>
+  <div class="gh"><b id="cgName"></b><button id="cgReload">↻ 更新</button><button id="cgTop">▲ 上へ</button></div>
+  <div id="cgrid"></div>
+  <div class="row" style="margin-top:12px"><button id="cgMore">もっと見る</button></div>
+</section>
 
 <dialog id="settings">
   <div class="dlg">
@@ -207,7 +226,7 @@ pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160p
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-18a"></script>
+<script src="app.js?v=2026-10-18b"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

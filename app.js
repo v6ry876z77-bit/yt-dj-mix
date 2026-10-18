@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-18a';
+const APP_VERSION = '2026-10-18b';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -645,47 +645,47 @@ function updateChanBadge() {
   const n = S.channels.reduce((s, c) => s + newCount(c), 0);
   $('#segC').textContent = n ? `チャンネル（新着${n}）` : 'チャンネル';
 }
+/* 右の列: チャンネル名の一覧（選んだチャンネルは強調）。動画はデッキA の下に大きく並べる */
 function renderChan() {
   const ul = $('#chan');
-  if (!chan.sel) {
-    if (!S.channels.length) {
-      ul.innerHTML = '<li class="hint">お気に入りチャンネルはまだありません。上の欄にチャンネル ID（UC で始まる英数字）を貼り付けて「追加」を押してください。<br>チャンネル ID は YouTube アプリのチャンネル画面 → 説明文の「…さらに表示」→「チャンネルを共有」→「チャンネル ID をコピー」で取れます。</li>';
-      return;
-    }
-    chan.listSel = Math.max(0, Math.min(chan.listSel, S.channels.length - 1));
-    ul.innerHTML = S.channels.map((c, i) => `<li data-ci="${i}" class="${i === chan.listSel ? 'sel' : ''}">
-      <span class="t"><span class="tt"></span><span class="sub"></span></span><button data-open>開く</button><button data-del>×</button></li>`).join('');
+  if (!S.channels.length) {
+    ul.innerHTML = '<li class="hint">お気に入りチャンネルはまだありません。上の欄にチャンネル ID（UC で始まる英数字）を貼り付けて「追加」を押してください。<br>チャンネル ID は YouTube アプリのチャンネル画面 → 説明文の「…さらに表示」→「チャンネルを共有」→「チャンネル ID をコピー」で取れます。</li>';
+  } else {
+    ul.innerHTML = S.channels.map((c, i) => `<li data-ci="${i}" class="${c.id === chan.sel ? 'sel' : ''}">
+      <span class="t"><span class="tt"></span><span class="sub"></span></span><button data-del>×</button></li>`).join('');
     $$('li[data-ci]', ul).forEach((li, i) => {
       const c = S.channels[i], n = newCount(c);
       $('.tt', li).textContent = c.name || c.id;
-      $('.sub', li).textContent = n ? `新着 ${n}` : (chan.vids[c.id] ? '' : '確認中…');
+      $('.sub', li).textContent = n ? `新着 ${n}` : (chan.vids[c.id] ? (c.id === chan.sel ? '↓ 下に動画一覧' : '') : '確認中…');
       if (n) $('.sub', li).style.color = 'var(--ok)';
     });
-    return;
   }
+  renderGrid();
+}
+function renderGrid() {
+  const sec = $('#chanGrid'), grid = $('#cgrid');
   const c = S.channels.find(x => x.id === chan.sel);
+  if (!c) { sec.hidden = true; return; }
+  sec.hidden = false;
+  $('#cgName').textContent = c.name || c.id;
   const vids = chan.vids[chan.sel];
-  let h = `<li class="more"><button data-back>← 一覧</button><span class="t chname"></span><button data-reload>↻</button></li>`;
-  if (!vids) h += '<li class="hint">読み込み中…</li>';
-  else if (!vids.length) h += '<li class="hint">動画が見つかりませんでした</li>';
-  else {
-    chan.itemSel = Math.max(0, Math.min(chan.itemSel, Math.min(vids.length, chan.shown) - 1));
-    h += vids.slice(0, chan.shown).map((id, i) => `<li data-vi="${i}" class="${i === chan.itemSel ? 'sel' : ''}">
-      <img loading="lazy" alt="" src="https://i.ytimg.com/vi/${id}/mqdefault.jpg"><span class="t"><span class="tt"></span><span class="sub"></span></span><button data-to="A">A</button><button data-to="B">B</button></li>`).join('');
-    if (vids.length > chan.shown) h += '<li class="more"><button data-more>もっと見る</button></li>';
-  }
-  ul.innerHTML = h;
-  $('.chname', ul).textContent = c ? (c.name || c.id) : '';
-  if (!vids) return;
+  $('#cgMore').hidden = !vids || vids.length <= chan.shown;
+  if (!vids) { grid.innerHTML = '<div class="hint">読み込み中…</div>'; return; }
+  if (!vids.length) { grid.innerHTML = '<div class="hint">動画が見つかりませんでした</div>'; return; }
+  chan.itemSel = Math.max(0, Math.min(chan.itemSel, Math.min(vids.length, chan.shown) - 1));
+  grid.innerHTML = vids.slice(0, chan.shown).map((id, i) => `<div class="vcard${i === chan.itemSel ? ' sel' : ''}" data-vi="${i}">
+    <img loading="lazy" alt="" src="https://i.ytimg.com/vi/${id}/mqdefault.jpg"><div class="new"></div><div class="ct"></div>
+    <div class="cb"><button data-to="A">A へ</button><button data-to="B">B へ</button></div></div>`).join('');
   const nNew = chan.newShown || 0;
-  $$('li[data-vi]', ul).forEach(li => {
-    const i = +li.dataset.vi, id = vids[i];
-    const fill = t => { $('.tt', li).textContent = t.title; $('.sub', li).textContent = i < nNew ? 'NEW' : ''; if (i < nNew) $('.sub', li).style.color = 'var(--ok)'; };
-    if (titleCache[id]) fill(titleCache[id]); else { $('.tt', li).textContent = '…'; getTitle(id).then(fill); }
+  $$('.vcard', grid).forEach(card => {
+    const i = +card.dataset.vi, id = vids[i];
+    if (i < nNew) $('.new', card).textContent = 'NEW';
+    const fill = t => { $('.ct', card).textContent = t.title; };
+    if (titleCache[id]) fill(titleCache[id]); else { $('.ct', card).textContent = '…'; getTitle(id).then(fill); }
   });
 }
 async function openChannel(c) {
-  chan.sel = c.id; chan.itemSel = 0; chan.shown = 25;
+  chan.sel = c.id; chan.itemSel = 0; chan.shown = 25; S.lastChan = c.id;
   chan.newShown = newCount(c);
   renderChan();
   if (!chan.vids[c.id]) { chan.vids[c.id] = await fetchUploads(c.id) || []; chan.newShown = newCount(c); }
@@ -702,6 +702,9 @@ async function refreshChannels() {
     if (listMode === 'chan') renderChan();
     updateChanBadge();
   }
+  // 前回開いていたチャンネルの動画を、デッキA の下に並べておく（新着の印はそのまま残す）
+  const last = S.channels.find(c => c.id === S.lastChan);
+  if (!chan.sel && last) { chan.sel = last.id; chan.newShown = newCount(last); renderChan(); }
 }
 async function addChannel() {
   const raw = $('#chIn').value.trim(); if (!raw) return;
@@ -728,26 +731,30 @@ $('#chAdd').addEventListener('click', addChannel);
 $('#chIn').addEventListener('keydown', e => { if (e.key === 'Enter') addChannel(); });
 $('#chan').addEventListener('click', e => {
   const t = e.target;
-  if (t.hasAttribute('data-back')) { chan.sel = null; renderChan(); return; }
-  if (t.hasAttribute('data-reload')) { const c = S.channels.find(x => x.id === chan.sel); delete chan.vids[chan.sel]; if (c) openChannel(c); return; }
-  if (t.hasAttribute('data-more')) { chan.shown += 25; renderChan(); return; }
-  const ci = t.closest('li[data-ci]');
-  if (ci) {
-    const i = +ci.dataset.ci, c = S.channels[i];
-    if (t.hasAttribute('data-del')) {
-      if (confirm(`「${c.name || c.id}」を登録から外しますか？`)) { S.channels.splice(i, 1); save(); renderChan(); updateChanBadge(); }
-      return;
+  const ci = t.closest('li[data-ci]'); if (!ci) return;
+  const i = +ci.dataset.ci, c = S.channels[i];
+  if (t.hasAttribute('data-del')) {
+    if (confirm(`「${c.name || c.id}」を登録から外しますか？`)) {
+      S.channels.splice(i, 1); if (chan.sel === c.id) chan.sel = null;
+      save(); renderChan(); updateChanBadge();
     }
-    chan.listSel = i; openChannel(c); return;
+    return;
   }
-  const vi = t.closest('li[data-vi]');
-  if (vi) {
-    const i = +vi.dataset.vi, id = chan.vids[chan.sel][i];
-    chan.itemSel = i;
-    if (t.dataset.to) loadInto(deckOf(t.dataset.to), { id, title: titleCache[id] ? titleCache[id].title : '' });
-    renderChan();
-  }
+  chan.listSel = i; openChannel(c);
+  $('#chanGrid').scrollIntoView({ behavior: 'smooth', block: 'start' }); // 画面をタップして開いたときは一覧までスクロール
 });
+// デッキA の下の動画一覧: カードを押すとデッキA へ（「B へ」ボタンはデッキB へ）
+$('#cgrid').addEventListener('click', e => {
+  const card = e.target.closest('.vcard'); if (!card) return;
+  const i = +card.dataset.vi, id = chan.vids[chan.sel][i];
+  chan.itemSel = i;
+  loadInto(deckOf(e.target.dataset.to || 'A'), { id, title: titleCache[id] ? titleCache[id].title : '' });
+  renderGrid();
+  window.scrollTo({ top: 0, behavior: 'smooth' }); // 読み込んだらデッキの位置へ戻る
+});
+$('#cgMore').addEventListener('click', () => { chan.shown += 25; renderGrid(); });
+$('#cgReload').addEventListener('click', () => { const c = S.channels.find(x => x.id === chan.sel); delete chan.vids[chan.sel]; if (c) openChannel(c); });
+$('#cgTop').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 $('#segC').addEventListener('click', () => { setListMode('chan'); renderChan(); });
 
 
@@ -832,10 +839,11 @@ function loadInto(deck, item) {
 function browse(delta) {
   const dir = delta > 0 ? 1 : -1;
   if (listMode === 'chan') {
-    if (!chan.sel) { if (!S.channels.length) return; chan.listSel = Math.max(0, Math.min(S.channels.length - 1, chan.listSel + dir)); }
-    else { const v = chan.vids[chan.sel] || []; if (!v.length) return; chan.itemSel = Math.max(0, Math.min(Math.min(v.length, chan.shown) - 1, chan.itemSel + dir)); }
-    renderChan();
-    const li = $('#chan li.sel'); if (li) li.scrollIntoView({ block: 'nearest' });
+    if (!chan.sel) { if (!S.channels.length) return; chan.listSel = Math.max(0, Math.min(S.channels.length - 1, chan.listSel + dir)); const c = S.channels[chan.listSel]; toast(`チャンネル: ${c.name || c.id}（LOAD で開く）`, 1500); return; }
+    const v = chan.vids[chan.sel] || []; if (!v.length) return;
+    chan.itemSel = Math.max(0, Math.min(Math.min(v.length, chan.shown) - 1, chan.itemSel + dir));
+    renderGrid();
+    const id = v[chan.itemSel]; toast(`${chan.itemSel + 1}. ${titleCache[id] ? titleCache[id].title : id}`, 1500);
     return;
   }
   if (listMode === 'srch') {
