@@ -56,9 +56,10 @@ body.bmini .deck[data-deck=B] .pitch{flex-direction:row;flex:0 0 auto;width:100%
 body.bmini .deck[data-deck=B] .pitch input{writing-mode:horizontal-tb;direction:ltr;width:auto;min-height:0}
 body.bmini .deck[data-deck=B] button{padding:6px 4px;font-size:13px;min-width:0}
 body.bmini .deck[data-deck=B] .transport button,body.bmini .deck[data-deck=B] .pads button{padding:8px 4px}
-body.bmini .deck[data-deck=B] .bar{height:10px}
+body.bmini .deck[data-deck=B] .bar{height:34px}
 body.bmini .deck[data-deck=B] .hint{display:none}
-.bar{position:relative;height:12px;background:var(--panel2);border-radius:6px;overflow:hidden;cursor:pointer;touch-action:none}
+/* 再生位置バー: 見た目は 12px、上下 12px ずつ透明な枠を付けて触れる範囲を 36px に広げる */
+.bar{position:relative;z-index:3;height:36px;margin:-12px 0;border-top:12px solid transparent;border-bottom:12px solid transparent;background:var(--panel2);background-clip:padding-box;overflow:hidden;cursor:pointer;touch-action:none}
 .bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.18)}
 .bar .loopz{position:absolute;top:0;bottom:0;background:rgba(61,220,132,.3);display:none}
 .bar .mk{position:absolute;top:0;bottom:0;width:2px;background:var(--warn)}
@@ -254,7 +255,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-21a"></script>
+<script src="app.js?v=2026-10-21b"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

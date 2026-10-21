@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-21a';
+const APP_VERSION = '2026-10-21b';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -231,12 +231,24 @@ class Deck {
       b.addEventListener('contextmenu', e => e.preventDefault());
     }
     this.ui.pit.addEventListener('input', () => this.setPitch(this.ui.pit.value / 1000, true));
+    // 再生位置バー: 触れた位置へ移動し、指を滑らせると追いかける（移動命令は 0.12 秒おきにまとめる）
+    let barDrag = false, barLast = 0, barTimer = null;
     const seekFromBar = e => {
-      if (!this.dur) return;
+      const dur = this.dur || (this.ready && this.player.getDuration && this.player.getDuration()) || 0;
+      if (!dur) { toast('曲の長さがまだ分からないので移動できません（少し待ってください）', 1500); return; }
+      if (!this.dur) this.dur = dur;
       const r = this.ui.bar.getBoundingClientRect();
-      this.seek(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * this.dur);
+      const t = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * dur;
+      clearTimeout(barTimer);
+      const now = performance.now();
+      if (now - barLast > 120) { barLast = now; this.seek(t); }
+      else barTimer = setTimeout(() => { barLast = performance.now(); this.seek(t); }, 120);
     };
-    this.ui.bar.addEventListener('pointerdown', seekFromBar);
+    this.ui.bar.addEventListener('pointerdown', e => { barDrag = true; try { this.ui.bar.setPointerCapture(e.pointerId); } catch (err) { } barLast = 0; seekFromBar(e); });
+    this.ui.bar.addEventListener('pointermove', e => { if (barDrag) seekFromBar(e); });
+    const endDrag = () => { barDrag = false; };
+    this.ui.bar.addEventListener('pointerup', endDrag);
+    this.ui.bar.addEventListener('pointercancel', endDrag);
     this.renderStatic();
   }
   /* --- YouTube --- */
