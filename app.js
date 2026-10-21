@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-18b';
+const APP_VERSION = '2026-10-21a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -107,6 +107,53 @@ function needTouchHint() {
 }
 
 /* ---------- デッキ ---------- */
+/* ---------- 動画ファイル用プレーヤー ----------
+   YouTube プレーヤーと同じ命令（playVideo / seekTo など）で <video> を動かす。
+   デッキは this.player をこれに差し替えるだけで、CUE・パッド・ループ・一時停止などがそのまま使える。
+   状態の番号は YouTube と同じ（-1 未開始, 0 終了, 1 再生中, 2 停止, 3 読み込み中, 5 頭出し済み）。 */
+class FilePlayer {
+  constructor(deck, video) {
+    this.deck = deck; this.v = video; this.state = -1; this.name = ''; this.url = null;
+    const emit = s => { if (this.state === s) return; this.state = s; if (deck.player === this) deck.onState(s); };
+    video.addEventListener('loadedmetadata', () => emit(5));
+    video.addEventListener('playing', () => emit(1));
+    video.addEventListener('waiting', () => emit(3));
+    video.addEventListener('pause', () => emit(2));
+    video.addEventListener('ended', () => emit(0));
+    video.addEventListener('ratechange', () => { if (deck.player === this) deck.rateActual = video.playbackRate; });
+    video.addEventListener('error', () => {
+      if (deck.player === this && this.url) toast(`デッキ${deck.name}: この動画ファイルは再生できません（形式に対応していない可能性があります）`, 4000);
+    });
+  }
+  open(file) {
+    if (this.url) URL.revokeObjectURL(this.url);
+    this.url = URL.createObjectURL(file); this.name = file.name; this.state = -1;
+    this.v.src = this.url; this.v.load();
+  }
+  stop() {
+    this.v.pause();
+    if (this.url) { URL.revokeObjectURL(this.url); this.url = null; }
+    this.v.removeAttribute('src'); this.v.load(); this.state = -1;
+  }
+  playVideo() { const p = this.v.play(); if (p) p.catch(() => { }); }
+  pauseVideo() { this.v.pause(); }
+  seekTo(t) { if (isFinite(t)) this.v.currentTime = Math.max(0, t); }
+  getCurrentTime() { return this.v.currentTime || 0; }
+  getDuration() { return isFinite(this.v.duration) ? this.v.duration : 0; }
+  getPlayerState() { return this.state; }
+  setVolume(v) { this.v.volume = Math.max(0, Math.min(1, v / 100)); }
+  getVolume() { return Math.round(this.v.volume * 100); }
+  mute() { this.v.muted = true; }
+  unMute() { this.v.muted = false; }
+  isMuted() { return this.v.muted; }
+  setPlaybackRate(r) { this.v.playbackRate = r; } // 動画ファイルはテンポを細かく変えられる
+  getPlaybackRate() { return this.v.playbackRate; }
+  getVideoData() { return { title: this.name }; }
+  // 字幕などは動画ファイルには無いので何もしない
+  loadModule() { } unloadModule() { } getOption() { return null; } setOption() { }
+  cueVideoById() { } loadVideoById() { }
+}
+
 class Deck {
   constructor(name) {
     this.name = name;
@@ -133,8 +180,10 @@ class Deck {
       this.restorePos = saved.pos || 0;
     }
     this.buildUI();
+    this.fp = new FilePlayer(this, this.ui.fvid); this.isFile = false;
   }
   serialize() {
+    if (this.isFile) return { videoId: '', title: '', cue: 0, hc: [], pos: 0 }; // 動画ファイルは次回開いたときには使えないので保存しない
     return { videoId: this.videoId, title: this.title, cue: this.cue, hc: this.hc, pos: this.videoId ? this.now() : 0 };
   }
   buildUI() {
@@ -142,7 +191,7 @@ class Deck {
     this.el.innerHTML = `
       <div class="vidrow">
         <div class="pitch"><span>テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span></div>
-        <div class="vid"><div id="player${n}"></div><div class="shield"></div></div>
+        <div class="vid"><div id="player${n}"></div><video class="fvid" playsinline preload="auto"></video><div class="shield"></div></div>
       </div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span></div>
@@ -159,7 +208,7 @@ class Deck {
       marks: $('.marks', this.el), loopz: $('.loopz', this.el), cur: $('.cur', this.el), dur: $('.dur', this.el),
       remain: $('.remain', this.el), snd: $('.snd', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
-      pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el),
+      pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el), fvid: $('.fvid', this.el),
     };
     // ボタン（CUE は押している間だけプレビューするので pointerdown/up を使う）
     for (const b of $$('[data-a]', this.el)) {
@@ -196,7 +245,7 @@ class Deck {
     // 字幕は英語を使う。言語はプレーヤー作成時にしか決められず、指定しないと端末の言語（日本語）になる
     pv.hl = 'en'; pv.cc_lang_pref = 'en';
     if (location.origin && location.origin !== 'null') pv.origin = location.origin;
-    this.player = new YT.Player(`player${this.name}`, {
+    this.player = this.yt = new YT.Player(`player${this.name}`, {
       width: '100%', height: '100%', playerVars: pv,
       events: {
         onReady: () => {
@@ -209,7 +258,27 @@ class Deck {
       },
     });
   }
+  /* 動画ファイルを読み込む（YouTube から動画ファイル用プレーヤーへ切り替える） */
+  loadFile(file) {
+    if (!window.YT || !this.ready) { toast('準備中です。少し待ってからもう一度選んでください'); return; }
+    try { this.yt.pauseVideo(); this.yt.mute(); } catch (e) { }
+    clearTimeout(this.primeTimer); this.primeTimer = null; this.priming = false;
+    this.isFile = true; this.player = this.fp; this.ui.vid.classList.add('file');
+    this.cue = 0; this.hc = Array(NCUES).fill(null); this.loop = { in: null, out: null, on: false };
+    this.videoId = 'file:' + file.name; this.title = file.name;
+    this.dur = 0; this.appliedRate = null; this.softPaused = false; this.state = -1;
+    this.base = 0; this.stamp = performance.now(); this.lastRaw = -1; this.ccFor = this.videoId;
+    this.fp.open(file); this.applyVolume(true);
+    this.renderStatic(); refreshLeds(); save();
+    toast(`デッキ${this.name}: ${file.name} を読み込みました`, 2000);
+  }
+  /* YouTube に戻す */
+  useYouTube() {
+    if (!this.isFile) return;
+    this.fp.stop(); this.isFile = false; this.player = this.yt; this.ui.vid.classList.remove('file');
+  }
   load(id, start = 0, keepCues = false) {
+    this.useYouTube();
     if (!keepCues || id !== this.videoId) {
       this.cue = start; this.hc = Array(NCUES).fill(null); this.loop = { in: null, out: null, on: false };
       const h = S.hist.find(x => x.id === id); this.title = h ? h.title : '';
@@ -325,7 +394,7 @@ class Deck {
       this.freezeAt(t);
       return;
     }
-    if (this.state === YT.PlayerState.CUED || this.state === YT.PlayerState.UNSTARTED) {
+    if (!this.isFile && (this.state === YT.PlayerState.CUED || this.state === YT.PlayerState.UNSTARTED)) {
       this.load(this.videoId, t, true); return;
     }
     this.player.seekTo(t, true);
@@ -401,7 +470,7 @@ class Deck {
     this.renderCc(); save();
   }
   applyCaptions() {
-    if (!this.ready || !this.videoId) return;
+    if (!this.ready || !this.videoId || this.isFile) return;
     this.ccFor = this.videoId;
     try { this.player.loadModule('captions'); } catch (e) { }
     // 言語はプレーヤー作成時の hl / cc_lang_pref（英語）で決まる。字幕の読み込みを待ってから大きさを反映
@@ -578,8 +647,10 @@ $('#srch').addEventListener('click', e => {
 });
 function setListMode(m) {
   listMode = m;
-  $('#srch').hidden = m !== 'srch'; $('#hist').hidden = m !== 'hist'; $('#chanPane').hidden = m !== 'chan';
-  $('#segS').classList.toggle('on', m === 'srch'); $('#segH').classList.toggle('on', m === 'hist'); $('#segC').classList.toggle('on', m === 'chan');
+  $('#srch').hidden = m !== 'srch'; $('#hist').hidden = m !== 'hist'; $('#chanPane').hidden = m !== 'chan'; $('#filePane').hidden = m !== 'file';
+  $('#segS').classList.toggle('on', m === 'srch'); $('#segH').classList.toggle('on', m === 'hist'); $('#segC').classList.toggle('on', m === 'chan'); $('#segF').classList.toggle('on', m === 'file');
+  // デッキA の下は、ファイルタブのときはファイル一覧、それ以外はチャンネルの動画一覧
+  try { renderGrid(); renderFiles(); } catch (e) { } // 起動処理の途中（一覧の準備前）に呼ばれた場合は何もしない
 }
 $('#segS').addEventListener('click', () => { setListMode('srch'); renderSrch(); });
 $('#segH').addEventListener('click', () => setListMode('hist'));
@@ -665,7 +736,7 @@ function renderChan() {
 function renderGrid() {
   const sec = $('#chanGrid'), grid = $('#cgrid');
   const c = S.channels.find(x => x.id === chan.sel);
-  if (!c) { sec.hidden = true; return; }
+  if (!c || listMode === 'file') { sec.hidden = true; return; }
   sec.hidden = false;
   $('#cgName').textContent = c.name || c.id;
   const vids = chan.vids[chan.sel];
@@ -757,6 +828,158 @@ $('#cgReload').addEventListener('click', () => { const c = S.channels.find(x => 
 $('#cgTop').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 $('#segC').addEventListener('click', () => { setListMode('chan'); renderChan(); });
 
+/* ---------- 動画ファイル（ファイルエクスプローラーとお気に入りフォルダ） ----------
+   フォルダを覚えられるブラウザ（showDirectoryPicker がある）では、選んだフォルダを IndexedDB に保存して
+   お気に入りにできる。無いブラウザでは、毎回フォルダ／ファイルを選んでもらう。 */
+const canKeepFolders = 'showDirectoryPicker' in window;
+const VIDEO_EXT = /\.(mp4|m4v|webm|mkv|mov|3gp|avi|wmv|mpe?g|ts|ogv)$/i;
+const fx = { mode: null, rootName: '', root: null, stack: [], files: null, entries: [], sel: 0 };
+const sortName = (a, b) => a.name.localeCompare(b.name, 'ja', { numeric: true });
+const fmtSize = n => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(0) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
+
+// IndexedDB（お気に入りフォルダの保存先）
+function favDb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('ytdj-files', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('favs', { keyPath: 'id', autoIncrement: true });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function favTx(mode, fn) {
+  const db = await favDb();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('favs', mode), st = tx.objectStore('favs');
+    const r = fn(st); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error);
+  });
+}
+const favList = () => favTx('readonly', st => st.getAll()).catch(() => []);
+let favCache = [];
+async function renderFavs() {
+  const ul = $('#favs');
+  if (!canKeepFolders) {
+    ul.innerHTML = '<li class="hint">このブラウザはフォルダを覚えられないため、お気に入りフォルダは使えません。毎回「フォルダを選ぶ」から選んでください。</li>';
+    return;
+  }
+  favCache = await favList();
+  if (!favCache.length) { ul.innerHTML = '<li class="hint">お気に入りフォルダはまだありません。「フォルダを選ぶ」で開いてから、下の一覧の「☆ お気に入りに追加」を押してください。</li>'; return; }
+  ul.innerHTML = favCache.map((f, i) => `<li data-fi="${i}" class="${fx.root === f.handle ? 'sel' : ''}"><span class="t"></span><button data-del>×</button></li>`).join('');
+  $$('li[data-fi]', ul).forEach((li, i) => { $('.t', li).textContent = '📁 ' + favCache[i].name; });
+}
+$('#favs').addEventListener('click', async e => {
+  const li = e.target.closest('li[data-fi]'); if (!li) return;
+  const f = favCache[+li.dataset.fi];
+  if (e.target.hasAttribute('data-del')) {
+    if (confirm(`お気に入りから「${f.name}」を外しますか？`)) { await favTx('readwrite', st => st.delete(f.id)); renderFavs(); }
+    return;
+  }
+  // 前回の許可が切れていたら、もう一度許可をもらう（画面のタップが必要）
+  try {
+    let p = await f.handle.queryPermission({ mode: 'read' });
+    if (p !== 'granted') p = await f.handle.requestPermission({ mode: 'read' });
+    if (p !== 'granted') { toast('フォルダを読む許可がもらえませんでした'); return; }
+  } catch (err) { toast('このフォルダを開けませんでした（移動・削除された可能性があります）', 4000); return; }
+  openFolderHandle(f.handle);
+});
+
+async function openFolderHandle(h) {
+  fx.mode = 'handle'; fx.root = h; fx.rootName = h.name; fx.stack = []; fx.files = null;
+  await loadEntries(); renderFavs(); showFiles();
+}
+// 今いるフォルダの中身（フォルダ → 動画ファイルの順）
+async function loadEntries() {
+  fx.sel = 0;
+  if (fx.mode === 'handle') {
+    const dir = fx.stack.length ? fx.stack[fx.stack.length - 1].h : fx.root;
+    const dirs = [], files = [];
+    try {
+      for await (const [name, e] of dir.entries()) {
+        if (name.startsWith('.')) continue;
+        if (e.kind === 'directory') dirs.push({ name, dir: true, h: e });
+        else if (VIDEO_EXT.test(name)) files.push({ name, h: e });
+      }
+    } catch (err) { toast('フォルダの中身を読めませんでした', 3000); }
+    fx.entries = [...dirs.sort(sortName), ...files.sort(sortName)];
+  } else if (fx.mode === 'list') {
+    // 選んだフォルダ内のファイル一覧（webkitRelativePath）から、今いる階層の中身を作る
+    const depth = fx.stack.length, prefix = fx.stack.map(s => s.name).join('/');
+    const dirs = new Map(), files = [];
+    for (const f of fx.files) {
+      const parts = (f.webkitRelativePath || f.name).split('/').slice(fx.hasRoot ? 1 : 0);
+      if (parts.slice(0, depth).join('/') !== prefix) continue;
+      const rest = parts.slice(depth);
+      if (rest.length > 1) dirs.set(rest[0], { name: rest[0], dir: true });
+      else if (VIDEO_EXT.test(rest[0]) || (f.type || '').startsWith('video/')) files.push({ name: rest[0], file: f });
+    }
+    fx.entries = [...[...dirs.values()].sort(sortName), ...files.sort(sortName)];
+  }
+}
+function showFiles() { setListMode('file'); renderFiles(); $('#fileGrid').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+function renderFiles() {
+  const sec = $('#fileGrid');
+  sec.hidden = listMode !== 'file' || !fx.mode;
+  if (sec.hidden) return;
+  $('#fgPath').textContent = '📁 ' + [fx.rootName, ...fx.stack.map(s => s.name)].join(' / ');
+  $('#fgFav').hidden = !(canKeepFolders && fx.mode === 'handle');
+  const list = $('#flist');
+  let h = fx.stack.length ? '<div class="frow up" data-up>⬆ ひとつ上のフォルダへ</div>' : '';
+  if (!fx.entries.length) h += '<div class="hint" style="padding:10px">このフォルダには動画ファイルがありません</div>';
+  h += fx.entries.map((e, i) => e.dir
+    ? `<div class="frow${i === fx.sel ? ' sel' : ''}" data-ei="${i}"><span class="fn"></span><span class="fs">フォルダ</span></div>`
+    : `<div class="frow${i === fx.sel ? ' sel' : ''}" data-ei="${i}"><span class="fn"></span><span class="fs"></span><button data-to="A">A へ</button><button data-to="B">B へ</button></div>`).join('');
+  list.innerHTML = h;
+  $$('.frow[data-ei]', list).forEach(row => {
+    const e = fx.entries[+row.dataset.ei];
+    $('.fn', row).textContent = (e.dir ? '📁 ' : '🎞 ') + e.name;
+    if (!e.dir) {
+      const setSize = f => { $('.fs', row).textContent = fmtSize(f.size); };
+      if (e.file) setSize(e.file); else e.h.getFile().then(setSize).catch(() => { });
+    }
+  });
+}
+async function openEntry(i, deckName) {
+  const e = fx.entries[i]; if (!e) return;
+  fx.sel = i;
+  if (e.dir) { fx.stack.push(e); await loadEntries(); renderFiles(); return; }
+  let file = e.file;
+  if (!file) { try { file = await e.h.getFile(); } catch (err) { toast('ファイルを開けませんでした', 3000); return; } }
+  deckOf(deckName || 'A').loadFile(file);
+  renderFiles();
+  window.scrollTo({ top: 0, behavior: 'smooth' }); // 読み込んだらデッキの位置へ戻る
+}
+$('#flist').addEventListener('click', async e => {
+  if (e.target.closest('[data-up]')) { fx.stack.pop(); await loadEntries(); renderFiles(); return; }
+  const row = e.target.closest('.frow[data-ei]'); if (!row) return;
+  openEntry(+row.dataset.ei, e.target.dataset.to);
+});
+$('#fgTop').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+$('#fgFav').addEventListener('click', async () => {
+  if (fx.mode !== 'handle') return;
+  const h = fx.stack.length ? fx.stack[fx.stack.length - 1].h : fx.root;
+  const favs = await favList();
+  for (const f of favs) { try { if (await f.handle.isSameEntry(h)) { toast('このフォルダはお気に入りに登録済みです'); return; } } catch (e) { } }
+  await favTx('readwrite', st => st.add({ name: h.name, handle: h }));
+  toast(`「${h.name}」をお気に入りに追加しました`, 2500); renderFavs();
+});
+// フォルダを選ぶ（覚えられるブラウザはフォルダごと、そうでなければフォルダ内のファイル一覧として）
+$('#fPickDir').addEventListener('click', async () => {
+  if (canKeepFolders) {
+    try { openFolderHandle(await window.showDirectoryPicker({ id: 'ytdj-video', mode: 'read' })); }
+    catch (err) { if (err.name !== 'AbortError') toast('フォルダを開けませんでした', 3000); }
+  } else $('#fDir').click();
+});
+$('#fPickFiles').addEventListener('click', () => $('#fFiles').click());
+function openFileList(files, hasRoot) {
+  if (!files.length) return;
+  fx.mode = 'list'; fx.files = files; fx.hasRoot = hasRoot; fx.stack = []; fx.root = null;
+  fx.rootName = hasRoot ? (files[0].webkitRelativePath || '').split('/')[0] || '選んだフォルダ' : '選んだファイル';
+  loadEntries().then(showFiles);
+}
+$('#fDir').addEventListener('change', e => { openFileList([...e.target.files], true); e.target.value = ''; });
+$('#fFiles').addEventListener('change', e => { openFileList([...e.target.files], false); e.target.value = ''; });
+$('#segF').addEventListener('click', () => { setListMode('file'); renderFavs(); renderFiles(); });
+
+
+
 
 const decodeHtml = s => { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; };
 function isoDur(s) {
@@ -838,6 +1061,12 @@ function loadInto(deck, item) {
 }
 function browse(delta) {
   const dir = delta > 0 ? 1 : -1;
+  if (listMode === 'file') {
+    if (!fx.entries.length) return;
+    fx.sel = Math.max(0, Math.min(fx.entries.length - 1, fx.sel + dir)); renderFiles();
+    const e = fx.entries[fx.sel]; toast((e.dir ? '📁 ' : '🎞 ') + e.name, 1500);
+    return;
+  }
   if (listMode === 'chan') {
     if (!chan.sel) { if (!S.channels.length) return; chan.listSel = Math.max(0, Math.min(S.channels.length - 1, chan.listSel + dir)); const c = S.channels[chan.listSel]; toast(`チャンネル: ${c.name || c.id}（LOAD で開く）`, 1500); return; }
     const v = chan.vids[chan.sel] || []; if (!v.length) return;
@@ -858,6 +1087,11 @@ function browse(delta) {
   const li = $(`#hist li[data-i="${histSel}"]`); if (li) li.scrollIntoView({ block: 'nearest' });
 }
 function loadSelected(deck) {
+  if (listMode === 'file') { // フォルダなら中へ、ファイルなら読み込む
+    const e = fx.entries[fx.sel]; if (!e) return;
+    if (!e.dir && deck.playing) { toast(`デッキ${deck.name} は再生中なので読み込みません（止めてから LOAD）`, 3000); return; }
+    openEntry(fx.sel, deck.name); return;
+  }
   if (listMode === 'chan') { // 一覧ではチャンネルを開き、動画一覧では読み込む
     if (!chan.sel) { const c = S.channels[chan.listSel]; if (c) openChannel(c); return; }
     const id = (chan.vids[chan.sel] || [])[chan.itemSel]; if (!id) return;
@@ -1185,7 +1419,7 @@ document.addEventListener('pointerdown', e => {
   keepAwake();
   if (!window.YT || e.target.closest('button')) return; // ボタンを押した場合はその操作を優先する
   for (const d of decks) {
-    if (d.ready && d.videoId && (d.priming || d.state === YT.PlayerState.UNSTARTED || d.state === YT.PlayerState.CUED)) d.load(d.videoId, d.priming ? d.primeAt : d.now(), true);
+    if (d.ready && d.videoId && !d.isFile && (d.priming || d.state === YT.PlayerState.UNSTARTED || d.state === YT.PlayerState.CUED)) d.load(d.videoId, d.priming ? d.primeAt : d.now(), true);
   }
 }, { once: true, capture: true });
 const BMODE_LABEL = { hide: 'B: 隠す', mini: 'B: 小', normal: 'B: 通常' };
