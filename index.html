@@ -36,7 +36,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(
 /* デッキB を隠すモード: デッキA とミキサーだけにして動画を最大化 */
 body.bhide .deck[data-deck=B]{display:none}
 @media (min-width:761px){
-  body.bhide main{grid-template-columns:minmax(0,1fr) minmax(190px,230px);align-items:start}
+  body.bhide main{grid-template-columns:minmax(0,1fr) minmax(220px,300px);align-items:start}
   body.bhide .deck[data-deck=A] .vid{width:min(100% - 60px,calc((100vh - 260px) * 16 / 9))}
   body.bhide .deck[data-deck=A] .lc{flex-direction:row}
 }
@@ -82,7 +82,7 @@ body.bmini .deck[data-deck=B] .hint{display:none}
 .mixer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .vols{display:flex;justify-content:space-around;align-items:flex-end;gap:10px}
 .vols label{display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:700}
-.vols input{writing-mode:vertical-lr;direction:rtl;height:150px;width:34px}
+.vols input{writing-mode:vertical-lr;direction:rtl;height:90px;width:34px}
 .xf{display:flex;flex-direction:column;gap:4px}
 .xf .lbl{display:flex;justify-content:space-between;font-weight:700}
 .xf input{width:100%}
@@ -102,6 +102,7 @@ body.bhide .hist li button[data-to=B]{display:none}
 .hist li.more{justify-content:center}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .seg>button{padding:6px 2px;font-size:13px;min-width:0;white-space:nowrap}
+.seg .badge{display:inline-block;min-width:1.5em;margin-left:4px;padding:0 5px;border-radius:9px;background:var(--ok);color:#000;font-size:11px;font-weight:800;line-height:1.5}
 .seg>button.on{background:#2d3b52;border-color:var(--a);color:var(--text)}
 .hint{color:var(--dim);font-size:12px}
 dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:0;width:min(900px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
@@ -255,7 +256,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-21b"></script>
+<script src="app.js?v=2026-10-25a"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

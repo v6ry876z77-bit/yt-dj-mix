@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-21b';
+const APP_VERSION = '2026-10-25a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -726,7 +726,8 @@ function newCount(c) {
 }
 function updateChanBadge() {
   const n = S.channels.reduce((s, c) => s + newCount(c), 0);
-  $('#segC').textContent = n ? `チャンネル（新着${n}）` : 'チャンネル';
+  // 新着の数は小さな丸で表示（文字で書くとボタンからはみ出すため）
+  $('#segC').innerHTML = n ? `チャンネル<span class="badge" title="新着">${n}</span>` : 'チャンネル';
 }
 /* 右の列: チャンネル名の一覧（選んだチャンネルは強調）。動画はデッキA の下に大きく並べる */
 function renderChan() {
