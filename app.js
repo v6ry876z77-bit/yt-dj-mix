@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25c';
+const APP_VERSION = '2026-10-25d';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -870,12 +870,12 @@ let favCache = [];
 async function renderFavs() {
   const ul = $('#favs');
   if (!canKeepFolders) {
-    ul.innerHTML = '<li class="hint">このブラウザはフォルダを覚えられないため、お気に入りフォルダは使えません。毎回「フォルダを選ぶ」から選んでください。</li>';
+    ul.innerHTML = '<li class="hint">このブラウザはフォルダを覚えられないため、お気に入りとして残せません。上のボタンでフォルダを選ぶと、アプリを閉じるまでの間だけ下に中身が表示されます。</li>';
     return;
   }
   favCache = await favList();
-  if (!favCache.length) { ul.innerHTML = '<li class="hint">お気に入りフォルダはまだありません。「フォルダを選ぶ」で開いてから、下の一覧の「☆ お気に入りに追加」を押してください。</li>'; return; }
-  ul.innerHTML = favCache.map((f, i) => `<li data-fi="${i}" class="${fx.root === f.handle ? 'sel' : ''}"><span class="t"></span><button data-del>×</button></li>`).join('');
+  if (!favCache.length) { ul.innerHTML = '<li class="hint">お気に入りフォルダはまだありません。上の「＋ お気に入りフォルダを追加」で、動画の入ったフォルダを選んでください。</li>'; return; }
+  ul.innerHTML = favCache.map((f, i) => `<li data-fi="${i}" class="${fx.mode === 'handle' && f.id === S.lastFav ? 'sel' : ''}"><span class="t"></span><button data-del>×</button></li>`).join('');
   $$('li[data-fi]', ul).forEach((li, i) => { $('.t', li).textContent = '📁 ' + favCache[i].name; });
 }
 $('#favs').addEventListener('click', async e => {
@@ -885,18 +885,22 @@ $('#favs').addEventListener('click', async e => {
     if (confirm(`お気に入りから「${f.name}」を外しますか？`)) { await favTx('readwrite', st => st.delete(f.id)); renderFavs(); }
     return;
   }
-  // 前回の許可が切れていたら、もう一度許可をもらう（画面のタップが必要）
+  openFav(f, true);
+});
+// 登録フォルダを開く（前回の許可が切れていたら、もう一度許可をもらう。画面のタップが必要）
+async function openFav(f, scroll) {
   try {
     let p = await f.handle.queryPermission({ mode: 'read' });
     if (p !== 'granted') p = await f.handle.requestPermission({ mode: 'read' });
     if (p !== 'granted') { toast('フォルダを読む許可がもらえませんでした'); return; }
   } catch (err) { toast('このフォルダを開けませんでした（移動・削除された可能性があります）', 4000); return; }
-  openFolderHandle(f.handle);
-});
+  S.lastFav = f.id; save();
+  openFolderHandle(f.handle, scroll);
+}
 
-async function openFolderHandle(h) {
+async function openFolderHandle(h, scroll = true) {
   fx.mode = 'handle'; fx.root = h; fx.rootName = h.name; fx.stack = []; fx.files = null;
-  await loadEntries(); renderFavs(); showFiles();
+  await loadEntries(); renderFavs(); showFiles(scroll);
 }
 // 今いるフォルダの中身（フォルダ → 動画ファイルの順）
 async function loadEntries() {
@@ -926,7 +930,7 @@ async function loadEntries() {
     fx.entries = [...[...dirs.values()].sort(sortName), ...files.sort(sortName)];
   }
 }
-function showFiles() { setListMode('file'); renderFiles(); $('#fileGrid').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+function showFiles(scroll = true) { setListMode('file'); renderFiles(); if (scroll) $('#fileGrid').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 function renderFiles() {
   const sec = $('#fileGrid');
   sec.hidden = listMode !== 'file' || !fx.mode;
@@ -973,14 +977,24 @@ $('#fgFav').addEventListener('click', async () => {
   await favTx('readwrite', st => st.add({ name: h.name, handle: h }));
   toast(`「${h.name}」をお気に入りに追加しました`, 2500); renderFavs();
 });
-// フォルダを選ぶ（覚えられるブラウザはフォルダごと、そうでなければフォルダ内のファイル一覧として）
-$('#fPickDir').addEventListener('click', async () => {
-  if (canKeepFolders) {
-    try { openFolderHandle(await window.showDirectoryPicker({ id: 'ytdj-video', mode: 'read' })); }
-    catch (err) { if (err.name !== 'AbortError') toast('フォルダを開けませんでした', 3000); }
-  } else $('#fDir').click();
+// お気に入りフォルダを追加（選んだフォルダを登録して、そのまま中身を表示する）
+$('#fAdd').addEventListener('click', async () => {
+  if (!canKeepFolders) { $('#fDir').click(); return; } // 覚えられないブラウザでは、今だけ表示する
+  let h;
+  try { h = await window.showDirectoryPicker({ id: 'ytdj-video', mode: 'read' }); }
+  catch (err) { if (err.name !== 'AbortError') toast('フォルダを開けませんでした', 3000); return; }
+  const favs = await favList();
+  let fav = null;
+  for (const f of favs) { try { if (await f.handle.isSameEntry(h)) fav = f; } catch (e) { } }
+  if (fav) toast('このフォルダは登録済みです');
+  else {
+    const id = await favTx('readwrite', st => st.add({ name: h.name, handle: h }));
+    fav = { id, name: h.name, handle: h };
+    toast(`「${h.name}」をお気に入りに追加しました`, 2500);
+  }
+  S.lastFav = fav.id; save();
+  openFolderHandle(h, true);
 });
-$('#fPickFiles').addEventListener('click', () => $('#fFiles').click());
 function openFileList(files, hasRoot) {
   if (!files.length) return;
   fx.mode = 'list'; fx.files = files; fx.hasRoot = hasRoot; fx.stack = []; fx.root = null;
@@ -988,8 +1002,11 @@ function openFileList(files, hasRoot) {
   loadEntries().then(showFiles);
 }
 $('#fDir').addEventListener('change', e => { openFileList([...e.target.files], true); e.target.value = ''; });
-$('#fFiles').addEventListener('change', e => { openFileList([...e.target.files], false); e.target.value = ''; });
-$('#segF').addEventListener('click', () => { setListMode('file'); renderFavs(); renderFiles(); });
+$('#segF').addEventListener('click', async () => {
+  setListMode('file'); await renderFavs(); renderFiles();
+  // 前回開いていた登録フォルダの中身を、デッキA の下に表示しておく
+  if (!fx.mode && S.lastFav != null) { const f = favCache.find(x => x.id === S.lastFav); if (f) openFav(f, false); }
+});
 
 
 
@@ -1069,7 +1086,7 @@ function openYouTubeSearch(q) {
   toast('気に入った動画は「共有」→「YT DJ」か、「共有」→「コピー」してから戻ってきてください', 5000);
 }
 function updateSearchPlaceholder() {
-  $('#qIn').placeholder = S.settings.ytKey ? '検索 または URL' : 'YouTube アプリで検索 または URL';
+  $('#qIn').placeholder = '検索ワード または URL'; // 長いと欄に収まらず切れるので短くする
 }
 $('#searchForm').addEventListener('submit', e => { e.preventDefault(); $('#qIn').blur(); runSearch(); });
 
