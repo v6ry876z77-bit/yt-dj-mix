@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25a';
+const APP_VERSION = '2026-10-25b';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -1028,7 +1028,13 @@ async function runSearch(more = false) {
     const q = $('#qIn').value.trim(); if (!q) return;
     // URL が入力されたら検索せずに履歴へ入れる
     const id = parseYouTubeId(q);
-    if (id && /youtu|^[\w-]{11}$/.test(q)) { addHistory(id, ''); histSel = 0; setListMode('hist'); renderHist(); toast('履歴に追加しました'); $('#qIn').value = ''; return; }
+    if (id && /youtu|^[\w-]{11}$/.test(q)) {
+      $('#qIn').value = '';
+      const A = deckOf('A');
+      if (A.playing) { addHistory(id, ''); histSel = 0; setListMode('hist'); renderHist(); toast('デッキA が再生中なので履歴に入れました（A を押すと読み込みます）', 3000); }
+      else { loadInto(A, { id, title: '' }); toast('デッキA に読み込みました', 2000); }
+      return;
+    }
     if (!S.settings.ytKey) { openYouTubeSearch(q); return; }
     Object.assign(srch, { q, items: [], next: null, sel: 0 });
   }
@@ -1118,12 +1124,6 @@ function loadSelected(deck) {
 }
 
 /* ---------- URL 貼り付け・共有 ---------- */
-function takeUrlInput() {
-  const id = parseYouTubeId($('#urlIn').value);
-  if (!id) { toast('YouTube の URL を認識できませんでした'); return null; }
-  $('#urlIn').value = ''; return id;
-}
-$$('[data-load]').forEach(b => b.addEventListener('click', () => { const id = takeUrlInput(); if (id) deckOf(b.dataset.load).load(id); }));
 let clipOffer = null;
 function offerClip(id) {
   clipOffer = { id };
@@ -1143,23 +1143,21 @@ $('#clipBar').addEventListener('click', e => {
   } else if (k === 'hist') { addHistory(id, ''); histSel = 0; setListMode('hist'); renderHist(); toast('履歴に追加しました'); }
 });
 // 画面に戻ってきた時にクリップボードを確認（新しい YouTube リンクがあれば提案）
-async function checkClipboard(manual = false) {
-  if (!navigator.clipboard?.readText) { if (manual) toast('この端末ではクリップボードを読めません。入力欄を長押しして貼り付けてください'); return; }
+async function checkClipboard() {
+  if (!navigator.clipboard?.readText) return;
   let text;
-  try { text = await navigator.clipboard.readText(); }
-  catch (e) { if (manual) toast('クリップボードを読めませんでした。入力欄を長押しして貼り付けてください'); return; }
+  try { text = await navigator.clipboard.readText(); } catch (e) { return; }
   const id = parseYouTubeId(text);
-  if (!id || !/youtu/.test(text)) { if (manual) { if (text) { $('#urlIn').value = text; $('#qIn').value = text; } else toast('クリップボードは空です'); } return; }
-  if (!manual && id === S.lastClip) return; // 同じリンクは何度も聞かない
+  if (!id || !/youtu/.test(text)) return;
+  if (id === S.lastClip) return; // 同じリンクは何度も聞かない
   S.lastClip = id; save();
   offerClip(id);
 }
-$('#btnClip').addEventListener('click', () => checkClipboard(true));
 let clipCheckAt = 0;
 function autoClip() {
   if (document.visibilityState !== 'visible') return;
   const t = Date.now(); if (t - clipCheckAt < 800) return; clipCheckAt = t;
-  setTimeout(() => checkClipboard(false), 300);
+  setTimeout(() => checkClipboard(), 300);
 }
 document.addEventListener('visibilitychange', autoClip);
 window.addEventListener('focus', autoClip);

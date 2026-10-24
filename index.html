@@ -86,8 +86,6 @@ body.bmini .deck[data-deck=B] .hint{display:none}
 .xf{display:flex;flex-direction:column;gap:4px}
 .xf .lbl{display:flex;justify-content:space-between;font-weight:700}
 .xf input{width:100%}
-.paste{display:flex;flex-direction:column;gap:6px}
-.paste .row>button{min-width:44px}
 .hist{list-style:none;margin:0;padding:0;overflow-y:auto;max-height:340px;border:1px solid var(--line);border-radius:8px}
 .hist li{display:flex;gap:4px;align-items:center;padding:5px 6px;border-bottom:1px solid var(--line)}
 .hist li.sel{background:#2d3b52}
@@ -178,11 +176,6 @@ body.bhide .frow button[data-to=B]{display:none}
       <div class="lbl"><span style="color:var(--a)">A</span><span>クロスフェーダー</span><span style="color:var(--b)">B</span></div>
       <input type="range" id="xfader" min="0" max="1000" value="500">
     </div>
-    <div class="paste">
-      <div class="row"><input id="urlIn" placeholder="URL を貼り付け" style="flex:1"><button id="btnClip" title="クリップボードから貼り付け">📋</button></div>
-      <div class="row"><button data-load="A">A へ</button><button data-load="B">B へ</button></div>
-      <span class="hint">YouTube で見つけた動画は「共有」→「YT DJ」、または「共有」→「コピー」してからこの画面に戻ると読み込めます。</span>
-    </div>
     <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="検索 または URL" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button></form>
     <div class="row seg"><button id="segS">検索</button><button id="segH">履歴</button><button id="segC" class="on">チャンネル</button><button id="segF">ファイル</button></div>
     <ul id="srch" class="hist" hidden></ul>
@@ -256,7 +249,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-25a"></script>
+<script src="app.js?v=2026-10-25b"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
