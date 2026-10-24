@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25b';
+const APP_VERSION = '2026-10-25c';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -660,11 +660,11 @@ $('#srch').addEventListener('click', e => {
 function setListMode(m) {
   listMode = m;
   $('#srch').hidden = m !== 'srch'; $('#hist').hidden = m !== 'hist'; $('#chanPane').hidden = m !== 'chan'; $('#filePane').hidden = m !== 'file';
-  $('#segS').classList.toggle('on', m === 'srch'); $('#segH').classList.toggle('on', m === 'hist'); $('#segC').classList.toggle('on', m === 'chan'); $('#segF').classList.toggle('on', m === 'file');
+  $('#segH').classList.toggle('on', m === 'hist'); $('#segC').classList.toggle('on', m === 'chan'); $('#segF').classList.toggle('on', m === 'file');
   // デッキA の下は、ファイルタブのときはファイル一覧、それ以外はチャンネルの動画一覧
   try { renderGrid(); renderFiles(); } catch (e) { } // 起動処理の途中（一覧の準備前）に呼ばれた場合は何もしない
 }
-$('#segS').addEventListener('click', () => { setListMode('srch'); renderSrch(); });
+// 「検索」タブは廃止。API キー登録時だけ、🔍 を押すと結果一覧（#srch）が表示される
 $('#segH').addEventListener('click', () => setListMode('hist'));
 
 /* ---------- お気に入りチャンネル（API キー不要） ----------

@@ -98,7 +98,7 @@ body.bmini .deck[data-deck=B] .hint{display:none}
 /* デッキB を隠しているときは一覧の「B」ボタンも隠して、タイトルを広く見せる */
 body.bhide .hist li button[data-to=B]{display:none}
 .hist li.more{justify-content:center}
-.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg{display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:6px} /* 履歴・チャンネル（新着の丸数字が入るので広め）・ファイル */
 .seg>button{padding:6px 2px;font-size:13px;min-width:0;white-space:nowrap}
 .seg .badge{display:inline-block;min-width:1.5em;margin-left:4px;padding:0 5px;border-radius:9px;background:var(--ok);color:#000;font-size:11px;font-weight:800;line-height:1.5}
 .seg>button.on{background:#2d3b52;border-color:var(--a);color:var(--text)}
@@ -177,7 +177,7 @@ body.bhide .frow button[data-to=B]{display:none}
       <input type="range" id="xfader" min="0" max="1000" value="500">
     </div>
     <form id="searchForm" class="row" style="flex-wrap:nowrap"><input id="qIn" type="search" placeholder="検索 または URL" enterkeyhint="search" style="flex:1"><button id="btnSearch" style="flex:0 0 auto">🔍</button></form>
-    <div class="row seg"><button id="segS">検索</button><button id="segH">履歴</button><button id="segC" class="on">チャンネル</button><button id="segF">ファイル</button></div>
+    <div class="row seg"><button id="segH">履歴</button><button id="segC" class="on">チャンネル</button><button id="segF">ファイル</button></div>
     <ul id="srch" class="hist" hidden></ul>
     <ul id="hist" class="hist" hidden></ul>
     <div id="chanPane" hidden>
@@ -249,7 +249,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-25b"></script>
+<script src="app.js?v=2026-10-25c"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
