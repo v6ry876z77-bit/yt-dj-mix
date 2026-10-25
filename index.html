@@ -207,6 +207,10 @@ body.bhide .frow button[data-to=B]{display:none}
       <button id="fAdd" style="width:100%;margin-bottom:4px">＋ お気に入りフォルダを追加</button>
       <div class="hint" style="margin-bottom:6px;color:var(--warn)">※ iCloud や Google ドライブなど、クラウドのフォルダは読めません（タブレット内のフォルダのみ）</div>
       <ul id="favs" class="hist"></ul>
+      <div class="hint" style="margin:12px 0 4px">☁ クラウドへのリンク（ブラウザで開きます。動画はダウンロードして登録フォルダに入れると再生できます）</div>
+      <ul id="clinks" class="hist"></ul>
+      <input id="clName" placeholder="リンクの名前（例：iCloud の英語動画）" style="width:100%;margin-top:6px">
+      <div class="row" style="flex-wrap:nowrap;margin-top:6px"><input id="clUrl" type="url" placeholder="URL（https://…）" style="flex:1"><button id="clAdd" style="flex:0 0 auto">追加</button></div>
       <input type="file" id="fDir" webkitdirectory multiple hidden>
     </div>
   </section>
@@ -268,7 +272,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-25i"></script>
+<script src="app.js?v=2026-10-25j"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25i';
+const APP_VERSION = '2026-10-25j';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -50,6 +50,7 @@ const defaults = () => ({
   hist: [],              // [{id,title}]
   xf: 0.5, vol: { A: 1, B: 1 },
   channels: [],          // お気に入りチャンネル [{id:'UC…', name, seen: 最後に見た最新動画ID}]
+  cloudLinks: [],        // クラウドへのリンク [{name, url}]
 });
 let S = defaults();
 try {
@@ -62,6 +63,14 @@ try {
 S.settings.cc = { A: true, B: true };
 delete S.settings.smallVideo; // 廃止した「動画: 大／小」の設定を消す
 // ユーザーに頼まれたお気に入りチャンネルを一度だけ登録しておく（消したあとに勝手に戻らないよう印を残す）
+// クラウドへのリンクは最初に一度だけ iCloud Drive と Google ドライブを入れておく（消したら戻さない）
+if (!S.seedCl1) {
+  S.cloudLinks = (S.cloudLinks || []).concat([
+    { name: 'iCloud Drive', url: 'https://www.icloud.com/iclouddrive/' },
+    { name: 'Google ドライブ', url: 'https://drive.google.com/' },
+  ]);
+  S.seedCl1 = 1;
+}
 if (!S.seedCh1) {
   for (const id of ['UC8-Th83bH_thdKZDJCrn88g', 'UCa6vGFO9ty8v5KZJXQxdhaw'])
     if (!S.channels.some(c => c.id === id)) S.channels.push({ id, name: '', seen: '' });
@@ -1005,6 +1014,37 @@ function openFileList(files, hasRoot) {
   loadEntries().then(showFiles);
 }
 $('#fDir').addEventListener('change', e => { openFileList([...e.target.files], true); e.target.value = ''; });
+/* ---------- クラウドへのリンク（中身は読めないので、Web ページ／アプリを開くだけ） ---------- */
+function renderCloudLinks() {
+  const ul = $('#clinks');
+  if (!S.cloudLinks.length) { ul.innerHTML = '<li class="hint">リンクはありません。下の欄で追加できます。</li>'; return; }
+  ul.innerHTML = S.cloudLinks.map((l, i) => `<li data-li="${i}"><span class="t"></span><button data-del>×</button></li>`).join('');
+  $$('li[data-li]', ul).forEach((li, i) => { $('.t', li).textContent = '☁ ' + S.cloudLinks[i].name; });
+}
+$('#clinks').addEventListener('click', e => {
+  const li = e.target.closest('li[data-li]'); if (!li) return;
+  const i = +li.dataset.li, l = S.cloudLinks[i];
+  if (e.target.hasAttribute('data-del')) {
+    if (confirm(`リンク「${l.name}」を消しますか？`)) { S.cloudLinks.splice(i, 1); save(); renderCloudLinks(); }
+    return;
+  }
+  window.open(l.url, '_blank', 'noopener'); // 新しいタブ（または対応アプリ）で開く。戻るときは画面の端からスワイプ
+});
+$('#clAdd').addEventListener('click', () => {
+  let url = $('#clUrl').value.trim(), name = $('#clName').value.trim();
+  if (!url) { toast('URL を入れてください'); return; }
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  let host = '';
+  try { host = new URL(url).hostname; } catch (err) { }
+  if (!host.includes('.')) { toast('URL の形が正しくありません（例：https://www.icloud.com/…）', 3000); return; }
+  if (!name) { try { name = new URL(url).hostname; } catch (err) { name = url; } }
+  S.cloudLinks.push({ name, url }); save();
+  $('#clUrl').value = ''; $('#clName').value = '';
+  renderCloudLinks(); toast(`リンク「${name}」を追加しました`, 2000);
+});
+$('#clUrl').addEventListener('keydown', e => { if (e.key === 'Enter') $('#clAdd').click(); });
+renderCloudLinks();
+
 $('#segF').addEventListener('click', async () => {
   setListMode('file'); await renderFavs(); renderFiles();
   // 前回開いていた登録フォルダの中身を、デッキA の下に表示しておく
