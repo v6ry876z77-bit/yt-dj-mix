@@ -142,6 +142,8 @@ body.bhide .vcard button[data-to=B]{display:none}
 #fileGrid{padding:4px 10px 24px}
 #fileGrid .gh{display:flex;gap:8px;align-items:center;margin:4px 0 10px;flex-wrap:wrap}
 #fileGrid .gh b{font-size:17px;margin-right:auto;overflow-wrap:anywhere}
+#fgPath .crumb{color:var(--a);text-decoration:underline;cursor:pointer}
+#fgPath .crumb.cur{color:var(--text);text-decoration:none;cursor:default}
 #flist{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .frow{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--line);font-size:16px;cursor:pointer}
 .frow:last-child{border-bottom:none}
@@ -185,7 +187,8 @@ body.bhide .frow button[data-to=B]{display:none}
       <ul id="chan" class="hist"></ul>
     </div>
     <div id="filePane" hidden>
-      <button id="fAdd" style="width:100%;margin-bottom:6px">＋ お気に入りフォルダを追加</button>
+      <button id="fAdd" style="width:100%;margin-bottom:4px">＋ お気に入りフォルダを追加</button>
+      <div class="hint" style="margin-bottom:6px;color:var(--warn)">※ iCloud や Google ドライブなど、クラウドのフォルダは読めません（タブレット内のフォルダのみ）</div>
       <ul id="favs" class="hist"></ul>
       <input type="file" id="fDir" webkitdirectory multiple hidden>
     </div>
@@ -193,7 +196,7 @@ body.bhide .frow button[data-to=B]{display:none}
   <section class="deck" data-deck="B"></section>
 </main>
 <section id="fileGrid" hidden>
-  <div class="gh"><b id="fgPath"></b><button id="fgFav">☆ お気に入りに追加</button><button id="fgTop">▲ 上へ</button></div>
+  <div class="gh"><b id="fgPath"></b><button id="fgTop">▲ 上へ</button></div>
   <div id="flist"></div>
 </section>
 <section id="chanGrid" hidden>
@@ -247,7 +250,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-25d"></script>
+<script src="app.js?v=2026-10-25e"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

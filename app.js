@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25d';
+const APP_VERSION = '2026-10-25e';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -935,8 +935,15 @@ function renderFiles() {
   const sec = $('#fileGrid');
   sec.hidden = listMode !== 'file' || !fx.mode;
   if (sec.hidden) return;
-  $('#fgPath').textContent = '📁 ' + [fx.rootName, ...fx.stack.map(s => s.name)].join(' / ');
-  $('#fgFav').hidden = !(canKeepFolders && fx.mode === 'handle');
+  // パンくず: 登録フォルダから今いるフォルダまで。途中の名前を押すとその階層へ戻る
+  const crumbs = [fx.rootName, ...fx.stack.map(s => s.name)];
+  const path = $('#fgPath'); path.innerHTML = '📁 ';
+  crumbs.forEach((name, depth) => {
+    if (depth) path.append(' › ');
+    const s = document.createElement('span'); s.textContent = name; s.dataset.depth = depth;
+    s.className = depth < crumbs.length - 1 ? 'crumb' : 'crumb cur';
+    path.append(s);
+  });
   const list = $('#flist');
   let h = fx.stack.length ? '<div class="frow up" data-up>⬆ ひとつ上のフォルダへ</div>' : '';
   if (!fx.entries.length) h += '<div class="hint" style="padding:10px">このフォルダには動画ファイルがありません</div>';
@@ -969,13 +976,9 @@ $('#flist').addEventListener('click', async e => {
   openEntry(+row.dataset.ei, e.target.dataset.to);
 });
 $('#fgTop').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-$('#fgFav').addEventListener('click', async () => {
-  if (fx.mode !== 'handle') return;
-  const h = fx.stack.length ? fx.stack[fx.stack.length - 1].h : fx.root;
-  const favs = await favList();
-  for (const f of favs) { try { if (await f.handle.isSameEntry(h)) { toast('このフォルダはお気に入りに登録済みです'); return; } } catch (e) { } }
-  await favTx('readwrite', st => st.add({ name: h.name, handle: h }));
-  toast(`「${h.name}」をお気に入りに追加しました`, 2500); renderFavs();
+$('#fgPath').addEventListener('click', async e => {
+  const s = e.target.closest('.crumb'); if (!s || s.classList.contains('cur')) return;
+  fx.stack = fx.stack.slice(0, +s.dataset.depth); await loadEntries(); renderFiles();
 });
 // お気に入りフォルダを追加（選んだフォルダを登録して、そのまま中身を表示する）
 $('#fAdd').addEventListener('click', async () => {
