@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25f';
+const APP_VERSION = '2026-10-25g';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -936,7 +936,8 @@ function renderFiles() {
   if (sec.hidden) return;
   // パンくず: 登録フォルダから今いるフォルダまで。途中の名前を押すとその階層へ戻る
   const crumbs = [fx.rootName, ...fx.stack.map(s => s.name)];
-  const path = $('#fgPath'); path.innerHTML = '📁 <span class="crumbLbl">お気に入り：</span>';
+  // 登録フォルダより上（内部ストレージ内のどこか）はブラウザの制限で分からないので「…」で示す
+  const path = $('#fgPath'); path.innerHTML = '📁 <span class="crumbLbl">内部ストレージ › … ›</span> ';
   crumbs.forEach((name, depth) => {
     if (depth) path.append(' › ');
     const s = document.createElement('span'); s.textContent = name; s.dataset.depth = depth;
