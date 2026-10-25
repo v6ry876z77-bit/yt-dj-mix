@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25g';
+const APP_VERSION = '2026-10-25h';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
