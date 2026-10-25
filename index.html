@@ -144,6 +144,7 @@ body.bhide .vcard button[data-to=B]{display:none}
 #fileGrid .gh b{font-size:17px;margin-right:auto;overflow-wrap:anywhere}
 #fgPath .crumb{color:var(--a);text-decoration:underline;cursor:pointer}
 #fgPath .crumb.cur{color:var(--text);text-decoration:none;cursor:default}
+#fgPath .crumbLbl{color:var(--dim);font-size:13px;font-weight:400}
 #flist{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .frow{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--line);font-size:16px;cursor:pointer}
 .frow:last-child{border-bottom:none}
@@ -196,11 +197,11 @@ body.bhide .frow button[data-to=B]{display:none}
   <section class="deck" data-deck="B"></section>
 </main>
 <section id="fileGrid" hidden>
-  <div class="gh"><b id="fgPath"></b><button id="fgTop">▲ 上へ</button></div>
+  <div class="gh"><b id="fgPath"></b></div>
   <div id="flist"></div>
 </section>
 <section id="chanGrid" hidden>
-  <div class="gh"><b id="cgName"></b><button id="cgReload">↻ 更新</button><button id="cgTop">▲ 上へ</button></div>
+  <div class="gh"><b id="cgName"></b><button id="cgReload">↻ 更新</button></div>
   <div id="cgrid"></div>
   <div class="row" style="margin-top:12px"><button id="cgMore">もっと見る</button></div>
 </section>
@@ -250,7 +251,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-25e"></script>
+<script src="app.js?v=2026-10-25f"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

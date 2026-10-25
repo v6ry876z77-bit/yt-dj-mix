@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25e';
+const APP_VERSION = '2026-10-25f';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -838,7 +838,6 @@ $('#cgrid').addEventListener('click', e => {
 });
 $('#cgMore').addEventListener('click', () => { chan.shown += 25; renderGrid(); });
 $('#cgReload').addEventListener('click', () => { const c = S.channels.find(x => x.id === chan.sel); delete chan.vids[chan.sel]; if (c) openChannel(c); });
-$('#cgTop').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 $('#segC').addEventListener('click', () => { setListMode('chan'); renderChan(); });
 
 /* ---------- 動画ファイル（ファイルエクスプローラーとお気に入りフォルダ） ----------
@@ -937,7 +936,7 @@ function renderFiles() {
   if (sec.hidden) return;
   // パンくず: 登録フォルダから今いるフォルダまで。途中の名前を押すとその階層へ戻る
   const crumbs = [fx.rootName, ...fx.stack.map(s => s.name)];
-  const path = $('#fgPath'); path.innerHTML = '📁 ';
+  const path = $('#fgPath'); path.innerHTML = '📁 <span class="crumbLbl">お気に入り：</span>';
   crumbs.forEach((name, depth) => {
     if (depth) path.append(' › ');
     const s = document.createElement('span'); s.textContent = name; s.dataset.depth = depth;
@@ -975,7 +974,6 @@ $('#flist').addEventListener('click', async e => {
   const row = e.target.closest('.frow[data-ei]'); if (!row) return;
   openEntry(+row.dataset.ei, e.target.dataset.to);
 });
-$('#fgTop').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 $('#fgPath').addEventListener('click', async e => {
   const s = e.target.closest('.crumb'); if (!s || s.classList.contains('cur')) return;
   fx.stack = fx.stack.slice(0, +s.dataset.depth); await loadEntries(); renderFiles();
