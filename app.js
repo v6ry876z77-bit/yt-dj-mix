@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25h';
+const APP_VERSION = '2026-10-25i';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -55,7 +55,8 @@ let S = defaults();
 try {
   const raw = localStorage.getItem(STORE_KEY);
   if (raw) { const o = JSON.parse(raw); S = Object.assign(defaults(), o); S.settings = Object.assign(defaults().settings, o.settings || {}); S.settings.cc = Object.assign({ A: false, B: false }, S.settings.cc);
-    if (o.settings && o.settings.bNormal) S.settings.bMode = 'normal'; delete S.settings.bNormal; }
+    if (o.settings && o.settings.bNormal) S.settings.bMode = 'normal'; delete S.settings.bNormal;
+    if (S.settings.bMode === 'mini') S.settings.bMode = 'hide'; } // 「小さく」は廃止
 } catch (e) { /* 保存領域が使えなくても動作は続ける */ }
 // 起動時は字幕をオンにする（途中でオフにしても、次に開いたときはまたオン）
 S.settings.cc = { A: true, B: true };
@@ -1452,7 +1453,7 @@ document.addEventListener('pointerdown', e => {
     if (d.ready && d.videoId && !d.isFile && (d.priming || d.state === YT.PlayerState.UNSTARTED || d.state === YT.PlayerState.CUED)) d.load(d.videoId, d.priming ? d.primeAt : d.now(), true);
   }
 }, { once: true, capture: true });
-const BMODE_LABEL = { hide: 'B: 隠す', mini: 'B: 小', normal: 'B: 通常' };
+const BMODE_LABEL = { hide: 'B: 隠す', normal: 'B: 通常' };
 function applyVideoSize() {
   // 隠すモードでも B が再生中なら小さく表示する（見えないまま鳴らさない）
   const m = S.settings.bMode === 'hide' && window.YT && deckOf('B').playing ? 'mini' : S.settings.bMode;
@@ -1461,7 +1462,7 @@ function applyVideoSize() {
   $('#btnBMode').textContent = BMODE_LABEL[S.settings.bMode] || BMODE_LABEL.hide;
 }
 $('#btnBMode').addEventListener('click', () => {
-  const order = ['hide', 'mini', 'normal'];
+  const order = ['hide', 'normal']; // 「小さく」は廃止（B を隠しているときに B が鳴った場合だけ自動で小さく出す）
   S.settings.bMode = order[(order.indexOf(S.settings.bMode) + 1) % order.length]; applyVideoSize(); save();
 });
 applyVideoSize();

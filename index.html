@@ -93,6 +93,15 @@ body.bmini .deck[data-deck=B] .hint{display:none}
 #xfader::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;margin-top:-9px;border-radius:50%;background:#e8eaf0;border:2px solid #000;box-shadow:0 1px 4px rgba(0,0,0,.6)}
 #xfader::-moz-range-track{height:8px;border-radius:4px;background:#4a5163}
 #xfader::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#e8eaf0;border:2px solid #000}
+/* テンポも ±0% が基準なので同じ見た目（縦向き。B を小さく表示したときの横向きにも対応） */
+input.pit{-webkit-appearance:none;appearance:none;background:transparent}
+input.pit::-webkit-slider-runnable-track{border-radius:4px;border:1px solid var(--line);
+  background:linear-gradient(to bottom,#4a5163 calc(50% - 1.5px),#e8eaf0 calc(50% - 1.5px),#e8eaf0 calc(50% + 1.5px),#4a5163 calc(50% + 1.5px))}
+input.pit::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;border-radius:50%;background:#e8eaf0;border:2px solid #000;box-shadow:0 1px 4px rgba(0,0,0,.6)}
+.vidrow .pitch input.pit::-webkit-slider-runnable-track{width:8px}
+.vidrow .pitch input.pit::-webkit-slider-thumb{margin-left:-9px}
+body.bmini .deck[data-deck=B] input.pit::-webkit-slider-runnable-track{width:auto;height:8px;background:linear-gradient(to right,#4a5163 calc(50% - 1.5px),#e8eaf0 calc(50% - 1.5px),#e8eaf0 calc(50% + 1.5px),#4a5163 calc(50% + 1.5px))}
+body.bmini .deck[data-deck=B] input.pit::-webkit-slider-thumb{margin-left:0;margin-top:-9px}
 .hist{list-style:none;margin:0;padding:0;overflow-y:auto;max-height:340px;border:1px solid var(--line);border-radius:8px}
 .hist li{display:flex;gap:4px;align-items:center;padding:5px 6px;border-bottom:1px solid var(--line)}
 .hist li.sel{background:#2d3b52}
@@ -228,7 +237,7 @@ body.bhide .frow button[data-to=B]{display:none}
       <label>ジョグ感度 <input type="number" id="optJog" min="0.002" max="0.5" step="0.005" style="width:6em"> 秒/目盛</label>
       <label>SHIFT＋ジョグの速さ <select id="optJogFast"><option value="5">5倍</option><option value="10">10倍</option><option value="30">30倍</option><option value="60">60倍</option></select></label>
       <label><input type="checkbox" id="optLed"> コントローラーのランプを点灯させる</label>
-      <label>デッキB の表示 <select id="optBMode"><option value="hide">隠す（再生中だけ小さく表示）</option><option value="mini">小さく</option><option value="normal">通常</option></select></label>
+      <label>デッキB の表示 <select id="optBMode"><option value="hide">隠す（再生中だけ小さく表示）</option><option value="normal">通常</option></select></label>
       <label style="grid-column:1/-1">YouTube API キー（検索用） <input id="optKey" type="password" autocomplete="off" spellcheck="false" style="flex:1" placeholder="AIza…"></label>
       <span class="hint" style="grid-column:1/-1">キーはこの端末の中だけに保存されます。1日あたり約100回まで検索できます。</span>
     </div>
@@ -259,7 +268,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-10-25h"></script>
+<script src="app.js?v=2026-10-25i"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
