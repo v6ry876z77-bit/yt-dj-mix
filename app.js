@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25k';
+const APP_VERSION = '2026-10-26a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -319,6 +319,11 @@ class Deck {
   onState(s) {
     this.state = s;
     if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.BUFFERING) this.lastChromeAt = performance.now();
+    // 字幕を字幕ボタンの状態に合わせる（読み込み直後の準備中にも行う。YouTube が勝手に字幕を出すことがあるため）
+    if (s === YT.PlayerState.PLAYING && this.ccFor !== this.videoId) {
+      if (S.settings.cc[this.name]) this.applyCaptions();
+      else { this.ccFor = this.videoId; try { this.player.unloadModule('captions'); } catch (e) { } }
+    }
     if (this.priming && s === YT.PlayerState.PLAYING) {
       // 再生が始まった直後は YouTube のバーが出ているので、消えるのを待ってから止める
       if (!this.primeTimer) this.primeTimer = setTimeout(() => this.primeCheck(), 4000);
@@ -334,10 +339,6 @@ class Deck {
       if (vd && vd.title && vd.title !== this.title) { this.title = vd.title; addHistory(this.videoId, this.title); this.renderStatic(); save(); }
     }
     if (s === YT.PlayerState.PLAYING) this.appliedRate = null; // 再生開始時にテンポを確実に反映
-    if (s === YT.PlayerState.PLAYING && this.ccFor !== this.videoId) {
-      if (S.settings.cc[this.name]) this.applyCaptions();
-      else { this.ccFor = this.videoId; try { this.player.unloadModule('captions'); } catch (e) { } }
-    }
     refreshLeds();
   }
   onError(code) {
@@ -585,7 +586,9 @@ class Deck {
     this.ui.cur.textContent = fmt(cur); this.ui.dur.textContent = fmt(this.dur);
     this.ui.remain.textContent = this.dur ? `残り ${fmt(this.dur - cur)}` : '';
     let snd = '';
-    if (this.videoId && this.ready && !this.priming) {
+    if (this.videoId && this.ready && this.priming) snd = '準備中…';
+    else if (this.videoId && this.ready && this.softPaused) snd = '⏸ 停止中'; // 停止中は音量を 0 にしているだけ
+    else if (this.videoId && this.ready) {
       let muted = false; try { muted = this.player.isMuted(); } catch (e) { }
       if (muted) snd = '🔇 消音中';
       else if (this.lastVolSent === 0) snd = this.vol === 0 ? '🔈 音量フェーダー 0' : '🔈 クロスフェーダーで無音';
