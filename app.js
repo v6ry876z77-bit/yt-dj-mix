@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-25j';
+const APP_VERSION = '2026-10-25k';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -1017,7 +1017,7 @@ $('#fDir').addEventListener('change', e => { openFileList([...e.target.files], t
 /* ---------- クラウドへのリンク（中身は読めないので、Web ページ／アプリを開くだけ） ---------- */
 function renderCloudLinks() {
   const ul = $('#clinks');
-  if (!S.cloudLinks.length) { ul.innerHTML = '<li class="hint">リンクはありません。下の欄で追加できます。</li>'; return; }
+  if (!S.cloudLinks.length) { ul.innerHTML = '<li class="hint">リンクはありません。</li>'; return; }
   ul.innerHTML = S.cloudLinks.map((l, i) => `<li data-li="${i}"><span class="t"></span><button data-del>×</button></li>`).join('');
   $$('li[data-li]', ul).forEach((li, i) => { $('.t', li).textContent = '☁ ' + S.cloudLinks[i].name; });
 }
@@ -1030,19 +1030,6 @@ $('#clinks').addEventListener('click', e => {
   }
   window.open(l.url, '_blank', 'noopener'); // 新しいタブ（または対応アプリ）で開く。戻るときは画面の端からスワイプ
 });
-$('#clAdd').addEventListener('click', () => {
-  let url = $('#clUrl').value.trim(), name = $('#clName').value.trim();
-  if (!url) { toast('URL を入れてください'); return; }
-  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-  let host = '';
-  try { host = new URL(url).hostname; } catch (err) { }
-  if (!host.includes('.')) { toast('URL の形が正しくありません（例：https://www.icloud.com/…）', 3000); return; }
-  if (!name) { try { name = new URL(url).hostname; } catch (err) { name = url; } }
-  S.cloudLinks.push({ name, url }); save();
-  $('#clUrl').value = ''; $('#clName').value = '';
-  renderCloudLinks(); toast(`リンク「${name}」を追加しました`, 2000);
-});
-$('#clUrl').addEventListener('keydown', e => { if (e.key === 'Enter') $('#clAdd').click(); });
 renderCloudLinks();
 
 $('#segF').addEventListener('click', async () => {
