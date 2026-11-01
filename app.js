@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-10-26a';
+const APP_VERSION = '2026-11-01a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -523,7 +523,12 @@ class Deck {
     this.ui.pv.textContent = `${p >= 0 ? '+' : ''}${(p * S.settings.pitchRange * 100).toFixed(1)}%`;
   }
   setVolume(v) { this.vol = v; S.vol[this.name] = v; $(`#vol${this.name}`).value = Math.round(v * 1000); applyVolumes(); save(); }
-  jog(delta) { this.jogAcc += delta; }
+  jog(delta) {
+    const now = performance.now();
+    // 0.25 秒以上あいた信号は新しい回転の始まりとして数え直す（再生中の揺れ対策用の目盛数・正味の向き）
+    if (now - (this.lastJogIn || 0) > 250) { this.jogTicks = 0; this.jogNet = 0; if (this.playing) this.jogAcc = 0; }
+    this.jogAcc += delta; this.jogTicks++; this.jogNet += delta > 0 ? 1 : -1; this.lastJogIn = now;
+  }
   applyVolume(force) {
     if (!this.ready) return;
     const xf = S.xf;
@@ -549,14 +554,20 @@ class Deck {
     const cur = this.now();
     if (this.loop.on && this.loop.out != null && this.playing && cur >= this.loop.out) this.seek(this.loop.in);
     // ジョグ（まとめて適用）
+    // 再生中は、短い間に 3 目盛以上回したときだけ動かす（ジョグのわずかな揺れで位置が動き、
+    // YouTube のバーが消えなくなるのを防ぐ）。止めている間は 1 目盛から細かく動かす
     const iv = this.playing ? 150 : 70;
-    if (this.jogAcc && t - this.lastJog > iv) {
+    if (this.jogAcc && this.playing && (this.jogTicks < 3 || Math.abs(this.jogNet) < 2)) {
+      if (t - this.lastJogIn > 250) { this.jogAcc = 0; this.jogTicks = 0; this.jogNet = 0; } // ぱらぱらした信号は捨てる
+    } else if (this.jogAcc && t - this.lastJog > iv) {
       const d = this.jogAcc * S.settings.jogSens;
-      this.jogAcc = 0; this.lastJog = t; this.seek(cur + d);
+      this.jogAcc = 0; this.jogTicks = 0; this.lastJog = t; this.seek(cur + d);
     }
     // テンポ
-    if (this.appliedRate !== this.wantRate && t - this.lastRateSet > 120 && !this.priming) {
-      this.player.setPlaybackRate(this.wantRate); this.appliedRate = this.wantRate; this.lastRateSet = t;
+    // YouTube は 0.25 刻みでしか変わらないので、実際の速さが変わるときだけ命令を送る（フェーダーの揺れ対策）
+    const rate = this.isFile ? Math.round(this.wantRate * 1000) / 1000 : Math.min(2, Math.max(0.25, Math.round(this.wantRate * 4) / 4));
+    if (this.appliedRate !== rate && t - this.lastRateSet > 120 && !this.priming) {
+      this.player.setPlaybackRate(rate); this.appliedRate = rate; this.lastRateSet = t;
       setTimeout(() => { try { this.rateActual = this.player.getPlaybackRate() || 1; } catch (e) { } }, 150);
     }
   }
