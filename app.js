@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-08c';
+const APP_VERSION = '2026-11-08d';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -1229,7 +1229,7 @@ async function initMidi() {
   try {
     midi = await navigator.requestMIDIAccess({ sysex: false });
     midi.onstatechange = () => bindInputs();
-    bindInputs(); midiDenied = false; $('#midiName').classList.remove('retry');
+    midiDenied = false; $('#midiName').classList.remove('retry'); bindInputs(); // 見つからない場合は bindInputs が押せる表示に戻す
   } catch (e) {
     midiDenied = true;
     // Chrome の設定でブロックされているか（確認を何度も閉じると自動で断られるようになる）
@@ -1240,9 +1240,10 @@ async function initMidi() {
     midiBlocked = blocked;
   }
 }
-let midiDenied = false, midiBlocked = false;
+let midiDenied = false, midiBlocked = false, midiNoDevice = false;
 // 許可されなかったときは、表示を押すともう一度許可を求める（ブロック中は設定の場所を案内）
 $('#midiName').addEventListener('click', () => {
+  if (midiNoDevice && !midiDenied) { toast('コントローラーを探しています…', 1500); midi = null; initMidi(); return; } // 刺し直したあとに探し直す
   if (!midiDenied) return;
   if (midiBlocked) toast('Chrome の「⋮」→「設定」→「サイトの設定」→「MIDI デバイスの制御」で、このサイトを「許可」にしてから、アプリを開き直してください', 8000);
   else initMidi();
@@ -1252,7 +1253,8 @@ function bindInputs() {
   const ins = [...midi.inputs.values()], outs = [...midi.outputs.values()];
   for (const i of ins) i.onmidimessage = onMidi;
   const live = ins.filter(i => i.state === 'connected');
-  setMidiStatus(live.length > 0, live.length ? live.map(i => i.name).join(', ') : 'コントローラーが見つかりません');
+  setMidiStatus(live.length > 0, live.length ? live.map(i => i.name).join(', ') : 'コントローラーが見つかりません（ここを押すと探し直す）');
+  midiNoDevice = !live.length; $('#midiName').classList.toggle('retry', midiNoDevice);
   $('#midiList').textContent = `入力: ${live.map(i => i.name).join(', ') || 'なし'} ／ 出力: ${outs.filter(o => o.state === 'connected').map(o => o.name).join(', ') || 'なし'}`;
   refreshLeds();
 }
