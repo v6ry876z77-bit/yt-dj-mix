@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-08d';
+const APP_VERSION = '2026-11-08e';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -27,6 +27,8 @@ for (const d of DECK_NAMES) {
   addT(`${d}.jog`, `デッキ${d} ジョグホイール`, 'rel', 'ジョグの天面をゆっくり回してください（2回目は側面。同じ信号なら自動で先へ進みます）');
   addT(`${d}.jogFast`, `デッキ${d} ジョグ（SHIFT を押しながら回したとき）`, 'rel', 'SHIFT を押したままジョグを回してください（ふだんと同じ信号なら、この項目はスキップで構いません）');
   for (let i = 1; i <= NCUES; i++) addT(`${d}.hc${i}`, `デッキ${d} パッド${i}（ホットキュー）`, 'button');
+  // SHIFT 中にパッドが別の信号を送る機種向け（SHIFT＋パッドでホットキューを消す）。かんたん割り当てには含めない
+  for (let i = 1; i <= NCUES; i++) addT(`${d}.hcDel${i}`, `デッキ${d} パッド${i} 削除（SHIFT＋パッド）`, 'button', 'SHIFT を押したままパッドを押してください');
   addT(`${d}.loopIn`, `デッキ${d} ループ IN`, 'button');
   addT(`${d}.loopOut`, `デッキ${d} ループ OUT／解除`, 'button');
   addT(`${d}.back`, `デッキ${d} 10秒戻る`, 'button');
@@ -38,6 +40,7 @@ addT('browse', 'ブラウズつまみ（履歴の選択）', 'rel', 'ブラウ�
 // ウィザードの手順（ジョグは天面と側面で2回）
 const WIZARD = [];
 for (const t of TARGETS) {
+  if (/\.hcDel\d$/.test(t.id)) continue; // 削除用は一覧からだけ割り当てる
   WIZARD.push(t.id);
   if (t.kind === 'rel' && t.id.endsWith('.jog')) WIZARD.push(t.id + '#2');
 }
@@ -1282,6 +1285,7 @@ function dispatch(b, val) {
   if (t.kind === 'button') {
     const pressed = val > 0;
     if (act === 'shift') { shiftHeld = pressed; return; }
+    if (act.startsWith('hcDel')) { if (pressed) deck.deleteHotcue(+act.slice(5) - 1); return; }
     if (act.startsWith('hc')) { if (pressed) deck.hotcue(+act.slice(2) - 1); return; }
     deck.button(act, pressed);
   } else if (t.kind === 'abs') {
