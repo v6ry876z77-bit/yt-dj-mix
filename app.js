@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-08e';
+const APP_VERSION = '2026-11-08f';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -1251,11 +1251,45 @@ $('#midiName').addEventListener('click', () => {
   if (midiBlocked) toast('Chrome の「⋮」→「設定」→「サイトの設定」→「MIDI デバイスの制御」で、このサイトを「許可」にしてから、アプリを開き直してください', 8000);
   else initMidi();
 });
+/* Hercules DJControl Mix Ultra 用の標準割り当て（2026-11-08 に実機の信号を採取。詳細は mixultra-midi.md） */
+const MIXULTRA_PRESET_VER = 'mixultra-v1';
+function mixUltraPreset() {
+  const m = {};
+  m['n:1:4'] = { t: 'shift' }; m['n:2:4'] = { t: 'shift' };
+  m['c:0:0'] = { t: 'xfader' };
+  m['c:0:1'] = { t: 'browse', rel: 'twos' };
+  m['n:0:0'] = { t: 'A.load' };                       // ブラウズの押し込み → デッキA に読み込む
+  for (const [d, ch, padCh, shiftCh] of [['A', 1, 6, 4], ['B', 2, 7, 5]]) {
+    m[`n:${ch}:7`] = { t: `${d}.play` };
+    m[`n:${ch}:6`] = { t: `${d}.cue` };
+    m[`n:${ch}:13`] = { t: `${d}.load` };
+    m[`c:${ch}:0`] = { t: `${d}.volume` };
+    m[`c:${ch}:8`] = { t: `${d}.pitch` };
+    m[`c:${ch}:10`] = { t: `${d}.jog`, rel: 'twos' };    // ジョグ天面
+    m[`c:${ch}:9`] = { t: `${d}.jog`, rel: 'twos' };     // ジョグ側面
+    m[`c:${shiftCh}:10`] = { t: `${d}.jogFast`, rel: 'twos' }; // SHIFT＋ジョグ天面
+    for (let i = 0; i < 8; i++) {
+      m[`n:${padCh}:${i}`] = { t: `${d}.hc${i + 1}` };        // HOT CUE モードのパッド
+      m[`n:${padCh}:${i + 8}`] = { t: `${d}.hcDel${i + 1}` }; // SHIFT＋パッド → ホットキュー削除
+    }
+    // LOOP モードのパッド1〜4: ループ IN / ループ OUT・解除 / 10秒戻る / 10秒進む
+    m[`n:${padCh}:16`] = { t: `${d}.loopIn` }; m[`n:${padCh}:17`] = { t: `${d}.loopOut` };
+    m[`n:${padCh}:18`] = { t: `${d}.back` }; m[`n:${padCh}:19`] = { t: `${d}.fwd` };
+  }
+  return m;
+}
+function applyMixUltraPreset(silent) {
+  if (Object.keys(S.map).length && S.mapPreset !== MIXULTRA_PRESET_VER) S.mapBackup = S.map; // 自分で学習した割り当ては念のため残す
+  S.map = mixUltraPreset(); S.mapPreset = MIXULTRA_PRESET_VER; S.settings.pitchInvert = false;
+  save(); refreshLeds();
+  if (!silent) toast('Mix Ultra 用の割り当てを読み込みました（学習の操作は不要です）', 3500);
+}
 function bindInputs() {
   if (!midi) return;
   const ins = [...midi.inputs.values()], outs = [...midi.outputs.values()];
   for (const i of ins) i.onmidimessage = onMidi;
   const live = ins.filter(i => i.state === 'connected');
+  if (live.some(i => /DJControl Mix Ultra/i.test(i.name)) && S.mapPreset !== MIXULTRA_PRESET_VER) applyMixUltraPreset();
   setMidiStatus(live.length > 0, live.length ? live.map(i => i.name).join(', ') : 'コントローラーが見つかりません（ここを押すと探し直す）');
   midiNoDevice = !live.length; $('#midiName').classList.toggle('retry', midiNoDevice);
   $('#midiList').textContent = `入力: ${live.map(i => i.name).join(', ') || 'なし'} ／ 出力: ${outs.filter(o => o.state === 'connected').map(o => o.name).join(', ') || 'なし'}`;
@@ -1448,6 +1482,9 @@ function wizEnd(finished) {
   if (finished) toast('割り当てが完了しました！', 3000);
   if ($('#settings').open) renderMapTable();
 }
+$('#btnMixUltra').addEventListener('click', () => {
+  if (confirm('Mix Ultra の標準の割り当てに戻しますか？（自分で学習した割り当ては置き換わります）')) { applyMixUltraPreset(); renderMapTable(); }
+});
 $('#btnWizard').addEventListener('click', () => {
   if (!midi || ![...midi.inputs.values()].some(i => i.state === 'connected')) { toast('先にコントローラーを接続してください'); return; }
   if (Object.keys(S.map).length && !confirm('今の割り当てを消去して最初から設定し直します。よろしいですか？')) return;
@@ -1467,7 +1504,6 @@ async function keepAwake() {
 document.addEventListener('visibilitychange', keepAwake);
 // 開始画面は使わず、起動と同時に MIDI 接続・画面スリープ防止を行う
 initMidi(); keepAwake();
-if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
 if (!hasTouched()) $('#tapHint').hidden = false;
 document.addEventListener('pointerdown', () => {
   touchedOnce = true; $('#tapHint').hidden = true; keepAwake();
