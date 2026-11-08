@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-08b';
+const APP_VERSION = '2026-11-08c';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -1229,9 +1229,24 @@ async function initMidi() {
   try {
     midi = await navigator.requestMIDIAccess({ sysex: false });
     midi.onstatechange = () => bindInputs();
-    bindInputs();
-  } catch (e) { setMidiStatus(false, 'MIDI の使用が許可されませんでした'); }
+    bindInputs(); midiDenied = false; $('#midiName').classList.remove('retry');
+  } catch (e) {
+    midiDenied = true;
+    // Chrome の設定でブロックされているか（確認を何度も閉じると自動で断られるようになる）
+    let blocked = false;
+    try { blocked = (await navigator.permissions.query({ name: 'midi' })).state === 'denied'; } catch (err) { }
+    setMidiStatus(false, blocked ? 'MIDI がブロックされています（ここを押すと直し方）' : 'MIDI が許可されていません（ここを押すと再試行）');
+    $('#midiName').classList.add('retry');
+    midiBlocked = blocked;
+  }
 }
+let midiDenied = false, midiBlocked = false;
+// 許可されなかったときは、表示を押すともう一度許可を求める（ブロック中は設定の場所を案内）
+$('#midiName').addEventListener('click', () => {
+  if (!midiDenied) return;
+  if (midiBlocked) toast('Chrome の「⋮」→「設定」→「サイトの設定」→「MIDI デバイスの制御」で、このサイトを「許可」にしてから、アプリを開き直してください', 8000);
+  else initMidi();
+});
 function bindInputs() {
   if (!midi) return;
   const ins = [...midi.inputs.values()], outs = [...midi.outputs.values()];
@@ -1448,7 +1463,10 @@ document.addEventListener('visibilitychange', keepAwake);
 initMidi(); keepAwake();
 if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
 if (!hasTouched()) $('#tapHint').hidden = false;
-document.addEventListener('pointerdown', () => { touchedOnce = true; $('#tapHint').hidden = true; keepAwake(); }, { once: true, capture: true });
+document.addEventListener('pointerdown', () => {
+  touchedOnce = true; $('#tapHint').hidden = true; keepAwake();
+  if (midiDenied && !midiBlocked) initMidi(); // 起動時に断られていたら、画面に触れたときにもう一度許可を求める
+}, { once: true, capture: true });
 const BMODE_LABEL = { hide: 'B: 隠す', normal: 'B: 通常' };
 function applyVideoSize() {
   // 隠すモードでも B が再生中なら小さく表示する（見えないまま鳴らさない）

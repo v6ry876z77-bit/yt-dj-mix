@@ -23,6 +23,7 @@ header h1{font-size:16px;margin:0;margin-right:auto}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--bad);margin-right:6px;vertical-align:middle}
 .dot.ok{background:var(--ok)}
 #midiName{color:var(--dim);font-size:13px}
+#midiName.retry{color:var(--warn);text-decoration:underline;cursor:pointer}
 main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(0,1fr);gap:10px;padding:10px}
 @media (max-width:760px){main{grid-template-columns:minmax(0,1fr)}}
 .deck{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:7px;min-width:0}
@@ -270,7 +271,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-11-08b"></script>
+<script src="app.js?v=2026-11-08c"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
