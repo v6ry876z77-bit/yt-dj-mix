@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-01a';
+const APP_VERSION = '2026-11-08a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -201,7 +201,7 @@ class Deck {
     this.el.innerHTML = `
       <div class="vidrow">
         <div class="pitch"><span>テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span></div>
-        <div class="vid"><div id="player${n}"></div><video class="fvid" playsinline preload="auto"></video><div class="shield"></div></div>
+        <div class="vid"><div id="player${n}"></div><video class="fvid" playsinline preload="auto"></video><div class="shield"></div><div class="prep"><span>準備中…</span></div></div>
       </div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span></div>
@@ -218,7 +218,7 @@ class Deck {
       marks: $('.marks', this.el), loopz: $('.loopz', this.el), cur: $('.cur', this.el), dur: $('.dur', this.el),
       remain: $('.remain', this.el), snd: $('.snd', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
-      pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el), fvid: $('.fvid', this.el),
+      pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el), fvid: $('.fvid', this.el), prep: $('.prep', this.el),
     };
     // ボタン（CUE は押している間だけプレビューするので pointerdown/up を使う）
     for (const b of $$('[data-a]', this.el)) {
@@ -312,6 +312,8 @@ class Deck {
     clearTimeout(this.primeTimer); this.primeTimer = null;
     this.priming = true; this.primeAt = start; this.primeStarted = performance.now();
     this.player.mute();
+    // 準備中（無音で少し再生している間）はサムネイル画像をかぶせて、動いている映像を見せない
+    this.ui.prep.style.backgroundImage = `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)`;
     this.player.loadVideoById({ videoId: id, startSeconds: start });
     addHistory(id, this.title);
     this.renderStatic(); refreshLeds(); save();
@@ -607,6 +609,7 @@ class Deck {
     }
     if (this.ui.snd.textContent !== snd) this.ui.snd.textContent = snd;
     this.ui.play.classList.toggle('on', this.playing);
+    this.ui.vid.classList.toggle('priming', !!(this.priming && !this.isFile));
     this.ui.cue.classList.toggle('on', this.cuePreview);
   }
 }

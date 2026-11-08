@@ -30,6 +30,10 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.5fr) minmax(
 .vid{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
 .vid iframe,.vid>div{position:absolute;inset:0;width:100%;height:100%}
 .vid .shield{z-index:2;background:transparent;touch-action:manipulation}
+/* 読み込み直後の準備中にかぶせるサムネイル */
+.vid .prep{z-index:3;display:none;background:#000 center/cover no-repeat;pointer-events:none;align-items:flex-end}
+.vid.priming .prep{display:flex}
+.vid .prep span{margin:10px;padding:4px 12px;background:rgba(0,0,0,.75);border-radius:6px;font-weight:700}
 .cc>button{padding:5px 6px;font-size:13px}
 .lc{display:flex;flex-direction:column;gap:7px}
 .lc>.row{flex:1 1 0;min-width:0}
@@ -270,7 +274,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-11-01a"></script>
+<script src="app.js?v=2026-11-08a"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
