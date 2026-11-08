@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-08f';
+const APP_VERSION = '2026-11-08g';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -33,6 +33,8 @@ for (const d of DECK_NAMES) {
   addT(`${d}.loopOut`, `デッキ${d} ループ OUT／解除`, 'button');
   addT(`${d}.back`, `デッキ${d} 10秒戻る`, 'button');
   addT(`${d}.fwd`, `デッキ${d} 10秒進む`, 'button');
+  addT(`${d}.back3`, `デッキ${d} 3秒戻る`, 'button');
+  addT(`${d}.fwd3`, `デッキ${d} 3秒進む`, 'button');
   addT(`${d}.load`, `デッキ${d} LOAD（履歴で選んだ曲を読み込む）`, 'button');
 }
 addT('browse', 'ブラウズつまみ（履歴の選択）', 'rel', 'ブラウズつまみを回してください');
@@ -209,7 +211,7 @@ class Deck {
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span></div>
       <div class="row transport">
         <button data-a="cue">CUE</button><button data-a="play">▶ / ❚❚</button>
-        <button data-a="back">−10秒</button><button data-a="fwd">+10秒</button>
+        <button data-a="back">−10秒</button><button data-a="back3">−3秒</button><button data-a="fwd3">+3秒</button><button data-a="fwd">+10秒</button>
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
       <div class="lc"><div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
@@ -411,6 +413,8 @@ class Deck {
         break;
       case 'back': this.seek(this.now() - (shiftHeld ? 30 : 10)); break;
       case 'fwd': this.seek(this.now() + (shiftHeld ? 30 : 10)); break;
+      case 'back3': this.seek(this.now() - 3); break;
+      case 'fwd3': this.seek(this.now() + 3); break;
       case 'loopIn':
         this.loop = { in: this.now(), out: null, on: false }; this.renderStatic(); break;
       case 'loopOut':
@@ -1252,7 +1256,7 @@ $('#midiName').addEventListener('click', () => {
   else initMidi();
 });
 /* Hercules DJControl Mix Ultra 用の標準割り当て（2026-11-08 に実機の信号を採取。詳細は mixultra-midi.md） */
-const MIXULTRA_PRESET_VER = 'mixultra-v1';
+const MIXULTRA_PRESET_VER = 'mixultra-v2'; // v2: LOOP モードのパッド5・6 に ±3秒を追加
 function mixUltraPreset() {
   const m = {};
   m['n:1:4'] = { t: 'shift' }; m['n:2:4'] = { t: 'shift' };
@@ -1272,14 +1276,15 @@ function mixUltraPreset() {
       m[`n:${padCh}:${i}`] = { t: `${d}.hc${i + 1}` };        // HOT CUE モードのパッド
       m[`n:${padCh}:${i + 8}`] = { t: `${d}.hcDel${i + 1}` }; // SHIFT＋パッド → ホットキュー削除
     }
-    // LOOP モードのパッド1〜4: ループ IN / ループ OUT・解除 / 10秒戻る / 10秒進む
+    // LOOP モードのパッド1〜6: ループ IN / ループ OUT・解除 / 10秒戻る / 10秒進む / 3秒戻る / 3秒進む
     m[`n:${padCh}:16`] = { t: `${d}.loopIn` }; m[`n:${padCh}:17`] = { t: `${d}.loopOut` };
     m[`n:${padCh}:18`] = { t: `${d}.back` }; m[`n:${padCh}:19`] = { t: `${d}.fwd` };
+    m[`n:${padCh}:20`] = { t: `${d}.back3` }; m[`n:${padCh}:21`] = { t: `${d}.fwd3` }; // パッド5・6: 3秒戻る／進む
   }
   return m;
 }
 function applyMixUltraPreset(silent) {
-  if (Object.keys(S.map).length && S.mapPreset !== MIXULTRA_PRESET_VER) S.mapBackup = S.map; // 自分で学習した割り当ては念のため残す
+  if (Object.keys(S.map).length && !S.mapPreset) S.mapBackup = S.map; // 自分で学習した割り当ては念のため残す（専用割り当ての版上げでは上書きしない）
   S.map = mixUltraPreset(); S.mapPreset = MIXULTRA_PRESET_VER; S.settings.pitchInvert = false;
   save(); refreshLeds();
   if (!silent) toast('Mix Ultra 用の割り当てを読み込みました（学習の操作は不要です）', 3500);
