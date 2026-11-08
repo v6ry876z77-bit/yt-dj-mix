@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-08a';
+const APP_VERSION = '2026-11-08b';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -177,7 +177,6 @@ class Deck {
     this.state = -1; this.dur = 0;
     this.lastRaw = -1; this.base = 0; this.stamp = 0;
     this.jogAcc = 0; this.lastJog = 0;
-    this.priming = false; this.primeAt = 0; this.primeTimer = null;
     this.cuePreview = false; this.playLatch = false;
     this.lastVolSent = -1; this.lastMuteCheck = 0;
     // 一時停止は「その位置で映像を止める」方式（本当の一時停止だとロゴや「その他の動画」が出て字幕が隠れるため）
@@ -201,7 +200,7 @@ class Deck {
     this.el.innerHTML = `
       <div class="vidrow">
         <div class="pitch"><span>テンポ</span><input type="range" class="pit" min="-1000" max="1000" value="0"><span class="pv">0.0%</span></div>
-        <div class="vid"><div id="player${n}"></div><video class="fvid" playsinline preload="auto"></video><div class="shield"></div><div class="prep"><span>準備中…</span></div></div>
+        <div class="vid"><div id="player${n}"></div><video class="fvid" playsinline preload="auto"></video><div class="shield"></div></div>
       </div>
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span></div>
@@ -218,7 +217,7 @@ class Deck {
       marks: $('.marks', this.el), loopz: $('.loopz', this.el), cur: $('.cur', this.el), dur: $('.dur', this.el),
       remain: $('.remain', this.el), snd: $('.snd', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
       play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
-      pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el), fvid: $('.fvid', this.el), prep: $('.prep', this.el),
+      pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el), fvid: $('.fvid', this.el),
     };
     // ボタン（CUE は押している間だけプレビューするので pointerdown/up を使う）
     for (const b of $$('[data-a]', this.el)) {
@@ -284,7 +283,6 @@ class Deck {
   loadFile(file) {
     if (!window.YT || !this.ready) { toast('準備中です。少し待ってからもう一度選んでください'); return; }
     try { this.yt.pauseVideo(); this.yt.mute(); } catch (e) { }
-    clearTimeout(this.primeTimer); this.primeTimer = null; this.priming = false;
     this.isFile = true; this.player = this.fp; this.ui.vid.classList.add('file');
     this.cue = 0; this.hc = Array(NCUES).fill(null); this.loop = { in: null, out: null, on: false };
     this.videoId = 'file:' + file.name; this.title = file.name;
@@ -308,32 +306,20 @@ class Deck {
     if (!this.ready) { this.videoId = id; this.restorePos = start; return; }
     this.videoId = id; this.dur = 0; this.appliedRate = null; this.softPaused = false;
     this.base = start; this.stamp = performance.now(); this.lastRaw = -1;
-    // 先頭を読み込ませてから止めておく（すぐに再生できるように）。この間は消音。
-    clearTimeout(this.primeTimer); this.primeTimer = null;
-    this.priming = true; this.primeAt = start; this.primeStarted = performance.now();
-    this.player.mute();
-    // 準備中（無音で少し再生している間）はサムネイル画像をかぶせて、動いている映像を見せない
-    this.ui.prep.style.backgroundImage = `url(https://i.ytimg.com/vi/${id}/hqdefault.jpg)`;
-    this.player.loadVideoById({ videoId: id, startSeconds: start });
+    // 頭出しだけしておく（再生ボタンで start の位置から始まる）
+    this.cueStart = start; this.state = YT.PlayerState.UNSTARTED; // すぐ「頭出し中」扱いにする（前の曲の状態を使わない）
+    this.player.cueVideoById({ videoId: id, startSeconds: start });
+    this.applyVolume(true);
     addHistory(id, this.title);
     this.renderStatic(); refreshLeds(); save();
   }
   onState(s) {
     this.state = s;
     if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.BUFFERING) this.lastChromeAt = performance.now();
-    // 字幕を字幕ボタンの状態に合わせる（読み込み直後の準備中にも行う。YouTube が勝手に字幕を出すことがあるため）
+    // 字幕を字幕ボタンの状態に合わせる（YouTube が勝手に字幕を出すことがあるため）
     if (s === YT.PlayerState.PLAYING && this.ccFor !== this.videoId) {
       if (S.settings.cc[this.name]) this.applyCaptions();
       else { this.ccFor = this.videoId; try { this.player.unloadModule('captions'); } catch (e) { } }
-    }
-    if (this.priming && s === YT.PlayerState.PLAYING) {
-      // 再生が始まった直後は YouTube のバーが出ているので、消えるのを待ってから止める
-      if (!this.primeTimer) this.primeTimer = setTimeout(() => this.primeCheck(), 4000);
-      return;
-    }
-    if (this.priming && s === YT.PlayerState.CUED) { // 自動再生できず頭出しだけされた場合
-      clearTimeout(this.primeTimer); this.primeTimer = null;
-      this.priming = false; this.player.unMute(); this.applyVolume(true);
     }
     if (s === YT.PlayerState.PLAYING || s === YT.PlayerState.PAUSED || s === YT.PlayerState.CUED) {
       const d = this.player.getDuration(); if (d) this.dur = d;
@@ -344,7 +330,6 @@ class Deck {
     refreshLeds();
   }
   onError(code) {
-    this.priming = false; try { this.player.unMute(); } catch (e) { }
     const msg = {
       2: 'URL が正しくありません', 5: 'この端末で再生できない動画です', 100: '動画が見つかりません（削除・非公開）',
       101: 'この動画は埋め込み再生が禁止されているか、日本では見られない動画です', 150: 'この動画は埋め込み再生が禁止されているか、日本では見られない動画です',
@@ -355,7 +340,7 @@ class Deck {
   /* --- 時刻（YouTube の報告は間引かれるので補間する） --- */
   now() {
     if (!this.ready || !this.videoId) return 0;
-    if (this.priming) return this.primeAt;
+    if (!this.isFile && (this.state === YT.PlayerState.CUED || this.state === YT.PlayerState.UNSTARTED)) return this.base;
     if (this.softPaused) return this.softT;
     const raw = this.player.getCurrentTime() || 0;
     const t = performance.now();
@@ -365,23 +350,7 @@ class Deck {
     }
     return this.base;
   }
-  primeCheck() {
-    this.primeTimer = null;
-    if (!this.priming) return;
-    const wait = this.lastChromeAt + 4000 - performance.now();
-    if (wait > 50) { this.primeTimer = setTimeout(() => this.primeCheck(), wait); return; }
-    this.finishPrime();
-  }
-  /* 準備完了: 頭（primeAt）に戻してその場で止める。再開は resume()（止めた位置から再生） */
-  finishPrime() {
-    clearTimeout(this.primeTimer); this.primeTimer = null;
-    if (!this.priming) return;
-    this.priming = false;
-    this.softPaused = true; this.softT = this.primeAt; this.base = this.primeAt;
-    this.freezeAt(this.primeAt);
-    this.player.unMute(); this.applyVolume(true);
-  }
-  get playing() { return !!window.YT && !this.priming && !this.softPaused && (this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING); } // YouTube の読み込み前は false
+  get playing() { return !!window.YT && !this.softPaused && (this.state === YT.PlayerState.PLAYING || this.state === YT.PlayerState.BUFFERING); } // YouTube の読み込み前は false
   /* 止める: seekTo(t, false) はシークバーを掴んだ状態になり、映像がその位置で止まる。このときロゴ等の表示が出ない */
   pauseSoft(t = this.now()) {
     this.softPaused = true; this.softT = t; this.base = t;
@@ -398,29 +367,30 @@ class Deck {
   /* 再開: 止めた位置へ通常のシークをしてから再生（playVideo だけだと止まったまま） */
   resume() {
     if (needTouchHint()) return;
-    if (this.priming) {
-      clearTimeout(this.primeTimer); this.primeTimer = null;
-      this.priming = false; this.softPaused = true; this.softT = this.primeAt;
-    }
     this.player.unMute();
     if (this.softPaused) {
       this.softPaused = false; this.applyVolume(true);
       this.player.seekTo(this.softT, true);
       this.base = this.softT; this.stamp = performance.now(); this.lastRaw = -1;
     } else this.applyVolume(true);
+    // 頭出し中に位置を動かしていたら、その位置から再生を始める
+    if (!this.isFile && (this.state === YT.PlayerState.CUED || this.state === YT.PlayerState.UNSTARTED) && Math.abs(this.base - this.cueStart) > 0.05) {
+      this.cueStart = this.base;
+      this.player.loadVideoById({ videoId: this.videoId, startSeconds: this.base });
+      return;
+    }
     this.player.playVideo();
   }
   seek(t) {
     if (!this.ready || !this.videoId) return;
     t = Math.max(0, this.dur ? Math.min(t, this.dur - 0.05) : t);
-    if (this.priming) { this.primeAt = t; this.base = t; return; }
     if (this.softPaused) { // 止めたまま位置だけ動かす
       this.softT = t; this.base = t;
       this.freezeAt(t);
       return;
     }
     if (!this.isFile && (this.state === YT.PlayerState.CUED || this.state === YT.PlayerState.UNSTARTED)) {
-      this.load(this.videoId, t, true); return;
+      this.base = t; return; // 頭出し中は位置だけ覚えておき、再生ボタンでその位置から始める
     }
     this.player.seekTo(t, true);
     this.base = t; this.stamp = performance.now(); this.lastRaw = this.player.getCurrentTime();
@@ -452,7 +422,7 @@ class Deck {
     }
   }
   cueDown() {
-    if (!this.videoId || this.priming) return;
+    if (!this.videoId) return;
     if (this.playing && !this.cuePreview) { this.pauseSoft(this.cue); return; }
     const t = this.now();
     if (Math.abs(t - this.cue) < 0.2) {
@@ -541,15 +511,7 @@ class Deck {
   /* --- 定期処理 --- */
   tick(t) {
     if (!this.ready || !this.videoId) return;
-    // 取りこぼし対策: 準備中のまま止まったら解除
-    // 自動再生が許可されず準備が進まない場合は、通常の読み込み（サムネイル表示）に切り替える
-    if (this.priming && t - this.primeStarted > 6000 && this.player.getPlayerState() === YT.PlayerState.UNSTARTED) {
-      this.priming = false; this.player.unMute(); this.applyVolume(true);
-      this.player.cueVideoById({ videoId: this.videoId, startSeconds: this.primeAt });
-      this.base = this.primeAt; return;
-    }
-    if (this.priming && t - this.primeStarted > 15000) this.finishPrime();
-    if (!this.priming && t - this.lastMuteCheck > 500) {
+    if (t - this.lastMuteCheck > 500) {
       this.lastMuteCheck = t;
       try { if (this.player.isMuted()) { this.player.unMute(); this.applyVolume(true); } } catch (e) { }
     }
@@ -568,7 +530,7 @@ class Deck {
     // テンポ
     // YouTube は 0.25 刻みでしか変わらないので、実際の速さが変わるときだけ命令を送る（フェーダーの揺れ対策）
     const rate = this.isFile ? Math.round(this.wantRate * 1000) / 1000 : Math.min(2, Math.max(0.25, Math.round(this.wantRate * 4) / 4));
-    if (this.appliedRate !== rate && t - this.lastRateSet > 120 && !this.priming) {
+    if (this.appliedRate !== rate && t - this.lastRateSet > 120) {
       this.player.setPlaybackRate(rate); this.appliedRate = rate; this.lastRateSet = t;
       setTimeout(() => { try { this.rateActual = this.player.getPlaybackRate() || 1; } catch (e) { } }, 150);
     }
@@ -599,8 +561,7 @@ class Deck {
     this.ui.cur.textContent = fmt(cur); this.ui.dur.textContent = fmt(this.dur);
     this.ui.remain.textContent = this.dur ? `残り ${fmt(this.dur - cur)}` : '';
     let snd = '';
-    if (this.videoId && this.ready && this.priming) snd = '準備中…';
-    else if (this.videoId && this.ready && this.softPaused) snd = '⏸ 停止中'; // 停止中は音量を 0 にしているだけ
+    if (this.videoId && this.ready && this.softPaused) snd = '⏸ 停止中'; // 停止中は音量を 0 にしているだけ
     else if (this.videoId && this.ready) {
       let muted = false; try { muted = this.player.isMuted(); } catch (e) { }
       if (muted) snd = '🔇 消音中';
@@ -609,7 +570,6 @@ class Deck {
     }
     if (this.ui.snd.textContent !== snd) this.ui.snd.textContent = snd;
     this.ui.play.classList.toggle('on', this.playing);
-    this.ui.vid.classList.toggle('priming', !!(this.priming && !this.isFile));
     this.ui.cue.classList.toggle('on', this.cuePreview);
   }
 }
@@ -1487,16 +1447,8 @@ document.addEventListener('visibilitychange', keepAwake);
 // 開始画面は使わず、起動と同時に MIDI 接続・画面スリープ防止を行う
 initMidi(); keepAwake();
 if (!Object.keys(S.map).length) setTimeout(() => toast('まず「⚙ 設定・割り当て」→「かんたん割り当て」でコントローラーを登録してください', 5000), 800);
-// 自動再生が許可されず準備できなかった曲は、最初に画面を触った時に準備し直す
 if (!hasTouched()) $('#tapHint').hidden = false;
-document.addEventListener('pointerdown', e => {
-  touchedOnce = true; $('#tapHint').hidden = true;
-  keepAwake();
-  if (!window.YT || e.target.closest('button')) return; // ボタンを押した場合はその操作を優先する
-  for (const d of decks) {
-    if (d.ready && d.videoId && !d.isFile && (d.priming || d.state === YT.PlayerState.UNSTARTED || d.state === YT.PlayerState.CUED)) d.load(d.videoId, d.priming ? d.primeAt : d.now(), true);
-  }
-}, { once: true, capture: true });
+document.addEventListener('pointerdown', () => { touchedOnce = true; $('#tapHint').hidden = true; keepAwake(); }, { once: true, capture: true });
 const BMODE_LABEL = { hide: 'B: 隠す', normal: 'B: 通常' };
 function applyVideoSize() {
   // 隠すモードでも B が再生中なら小さく表示する（見えないまま鳴らさない）
