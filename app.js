@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-08g';
+const APP_VERSION = '2026-11-14a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -405,6 +405,7 @@ class Deck {
     if (a === 'cue') { pressed ? this.cueDown() : this.cueUp(); return; }
     if (!pressed) return;
     if (!this.videoId && a !== 'load') { toast(`デッキ${this.name} に曲がありません`); return; }
+    if (['back', 'fwd', 'back3', 'fwd3', 'loopIn'].includes(a)) this.flash(`[data-a="${a}"]`, a); // 押した瞬間だけ働くボタンは一瞬光らせる
     switch (a) {
       case 'play':
         if (this.cuePreview) { this.playLatch = true; break; }
@@ -446,14 +447,21 @@ class Deck {
     if (!this.playLatch) this.pauseSoft(this.cue);
     this.playLatch = false;
   }
+  /* 押した瞬間だけ働く操作の手ごたえ: 画面のボタンを一瞬光らせ、コントローラーのランプにも一瞬点灯の信号を送る */
+  flash(sel, ledAct) {
+    const b = $(sel, this.el); if (b) { b.classList.add('flash'); clearTimeout(b._ft); b._ft = setTimeout(() => b.classList.remove('flash'), 250); }
+    if (ledAct && midi && S.settings.led) { const t = `${this.name}.${ledAct}`; sendLed(t, true); setTimeout(() => sendLed(t, false), 200); }
+  }
   hotcue(i) {
     if (!this.videoId) { toast(`デッキ${this.name} に曲がありません`); return; }
+    this.flash(`[data-hc="${i}"]`);
     if (shiftHeld) { this.deleteHotcue(i); return; }
     if (this.hc[i] == null) { this.hc[i] = this.now(); toast(`パッド${i + 1} に登録 (${fmt(this.hc[i])})`, 1200); }
     else { this.seek(this.hc[i]); if (!this.playing) this.resume(); }
     this.renderStatic(); refreshLeds(); save();
   }
   deleteHotcue(i) {
+    this.flash(`[data-hc="${i}"]`);
     if (this.hc[i] == null) return;
     this.hc[i] = null; toast(`パッド${i + 1} を消去`, 1200); this.renderStatic(); refreshLeds(); save();
   }

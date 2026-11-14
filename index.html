@@ -17,6 +17,9 @@ html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,
 button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 button:active{filter:brightness(1.4)}
 button.on{background:var(--ok);color:#000;border-color:var(--ok)}
+/* 押した瞬間だけ光る（−10秒・パッドなど）。消えるときは少しだけゆっくり */
+button{transition:background-color .2s,color .2s,border-color .2s}
+button.flash{background:#fff!important;color:#000!important;border-color:#fff!important;transition:none}
 input,select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
 header{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
 header h1{font-size:16px;margin:0;margin-right:auto}
@@ -273,7 +276,7 @@ body.bhide .frow button[data-to=B]{display:none}
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-11-08g"></script>
+<script src="app.js?v=2026-11-14a"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
