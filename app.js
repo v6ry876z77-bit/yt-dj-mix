@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-14a';
+const APP_VERSION = '2026-11-24a';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -56,6 +56,7 @@ const defaults = () => ({
   xf: 0.5, vol: { A: 1, B: 1 },
   channels: [],          // お気に入りチャンネル [{id:'UC…', name, seen: 最後に見た最新動画ID}]
   cloudLinks: [],        // クラウドへのリンク [{name, url}]
+  cues: {},              // 曲ごとのホットキュー等 { 動画ID または file:名前:大きさ: {cue, hc:[8], li, lo, t} }
 });
 let S = defaults();
 try {
@@ -85,7 +86,7 @@ let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    for (const d of decks) S.decks[d.name] = d.serialize();
+    for (const d of decks) { S.decks[d.name] = d.serialize(); d.storeCues(); }
     try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { }
   }, 300);
 }
@@ -284,13 +285,31 @@ class Deck {
       },
     });
   }
+  /* 曲ごとのホットキュー・CUE・ループの記録（Serato や djay のように、同じ曲を読み込むと戻る） */
+  storeCues() {
+    const key = this.videoId; if (!key) return;
+    const used = this.hc.some(c => c != null) || this.cue > 0.05 || this.loop.in != null;
+    if (!used) { delete S.cues[key]; return; }
+    S.cues[key] = { cue: this.cue, hc: this.hc.slice(), li: this.loop.in, lo: this.loop.out, t: Date.now() };
+    const keys = Object.keys(S.cues);
+    if (keys.length > 1000) keys.sort((x, y) => S.cues[x].t - S.cues[y].t).slice(0, keys.length - 1000).forEach(k => delete S.cues[k]);
+  }
+  restoreCues(key) {
+    const c = S.cues && S.cues[key]; if (!c) return;
+    this.cue = c.cue || 0;
+    this.hc = (c.hc || []).concat(Array(NCUES).fill(null)).slice(0, NCUES);
+    this.loop = { in: c.li ?? null, out: c.lo ?? null, on: false };
+  }
   /* 動画ファイルを読み込む（YouTube から動画ファイル用プレーヤーへ切り替える） */
   loadFile(file) {
+    this.storeCues(); // 替える前に今の曲の記録を保存
     if (!window.YT || !this.ready) { toast('準備中です。少し待ってからもう一度選んでください'); return; }
     try { this.yt.pauseVideo(); this.yt.mute(); } catch (e) { }
     this.isFile = true; this.player = this.fp; this.ui.vid.classList.add('file');
     this.cue = 0; this.hc = Array(NCUES).fill(null); this.loop = { in: null, out: null, on: false };
-    this.videoId = 'file:' + file.name; this.title = file.name;
+    // 動画ファイルは「名前＋大きさ」で同じ曲かを見分け、前に打ったホットキュー等を戻す
+    this.videoId = `file:${file.name}:${file.size}`; this.title = file.name;
+    this.restoreCues(this.videoId);
     this.dur = 0; this.appliedRate = null; this.softPaused = false; this.state = -1;
     this.base = 0; this.stamp = performance.now(); this.lastRaw = -1; this.ccFor = this.videoId;
     this.fp.open(file); this.applyVolume(true);
@@ -303,10 +322,12 @@ class Deck {
     this.fp.stop(); this.isFile = false; this.player = this.yt; this.ui.vid.classList.remove('file');
   }
   load(id, start = 0, keepCues = false) {
+    this.storeCues(); // 替える前に今の曲の記録を保存
     this.useYouTube();
     if (!keepCues || id !== this.videoId) {
       this.cue = start; this.hc = Array(NCUES).fill(null); this.loop = { in: null, out: null, on: false };
       const h = S.hist.find(x => x.id === id); this.title = h ? h.title : '';
+      this.restoreCues(id); // この曲で前に打ったホットキュー・CUE・ループを戻す
     }
     if (!this.ready) { this.videoId = id; this.restorePos = start; return; }
     this.videoId = id; this.dur = 0; this.appliedRate = null; this.softPaused = false;
