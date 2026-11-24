@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-24a';
+const APP_VERSION = '2026-11-24b';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -22,6 +22,8 @@ addT('xfader', 'クロスフェーダー', 'abs');
 for (const d of DECK_NAMES) {
   addT(`${d}.play`, `デッキ${d} 再生／一時停止`, 'button');
   addT(`${d}.cue`, `デッキ${d} CUE`, 'button');
+  addT(`${d}.cueSet`, `デッキ${d} SET（今の位置を CUE にする）`, 'button');
+  addT(`${d}.cueJump`, `デッキ${d} ↶（CUE へ戻って再生を続ける）`, 'button');
   addT(`${d}.volume`, `デッキ${d} 音量フェーダー`, 'abs');
   addT(`${d}.pitch`, `デッキ${d} ピッチ（テンポ）フェーダー`, 'abs');
   addT(`${d}.jog`, `デッキ${d} ジョグホイール`, 'rel', 'ジョグの天面をゆっくり回してください（2回目は側面。同じ信号なら自動で先へ進みます）');
@@ -211,7 +213,7 @@ class Deck {
       <div class="bar"><div class="loopz"></div><div class="fill"></div><div class="marks"></div><div class="ph"></div></div>
       <div class="time"><span><span class="cur">0:00</span> / <span class="dur">0:00</span></span><span class="remain"></span><span class="snd"></span></div>
       <div class="row transport">
-        <button data-a="cue">CUE</button><button data-a="play">▶ / ❚❚</button>
+        <button data-a="cue">CUE</button><button data-a="cueSet">SET</button><button data-a="cueJump">↶</button><button data-a="play">▶ / ❚❚</button>
         <button data-a="back">−10秒</button><button data-a="back3">−3秒</button><button data-a="fwd3">+3秒</button><button data-a="fwd">+10秒</button>
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
@@ -426,12 +428,19 @@ class Deck {
     if (a === 'cue') { pressed ? this.cueDown() : this.cueUp(); return; }
     if (!pressed) return;
     if (!this.videoId && a !== 'load') { toast(`デッキ${this.name} に曲がありません`); return; }
-    if (['back', 'fwd', 'back3', 'fwd3', 'loopIn'].includes(a)) this.flash(`[data-a="${a}"]`, a); // 押した瞬間だけ働くボタンは一瞬光らせる
+    if (['back', 'fwd', 'back3', 'fwd3', 'loopIn', 'cueSet', 'cueJump'].includes(a)) this.flash(`[data-a="${a}"]`, a); // 押した瞬間だけ働くボタンは一瞬光らせる
     switch (a) {
       case 'play':
         if (this.cuePreview) { this.playLatch = true; break; }
         if (this.playing) this.pauseSoft();
         else this.resume();
+        break;
+      case 'cueSet': // 再生を止めずに、今の位置を CUE にする
+        this.cue = this.now(); this.renderStatic(); save(); break;
+      case 'cueJump': // CUE の位置へ戻り、止まらずに再生を続ける（止まっていたら CUE から再生を始める）
+        if (this.cuePreview) { this.cuePreview = false; this.playLatch = false; }
+        this.seek(this.cue);
+        if (!this.playing) { if (needTouchHint()) break; this.resume(); }
         break;
       case 'back': this.seek(this.now() - (shiftHeld ? 30 : 10)); break;
       case 'fwd': this.seek(this.now() + (shiftHeld ? 30 : 10)); break;
@@ -1285,7 +1294,7 @@ $('#midiName').addEventListener('click', () => {
   else initMidi();
 });
 /* Hercules DJControl Mix Ultra 用の標準割り当て（2026-11-08 に実機の信号を採取。詳細は mixultra-midi.md） */
-const MIXULTRA_PRESET_VER = 'mixultra-v2'; // v2: LOOP モードのパッド5・6 に ±3秒を追加
+const MIXULTRA_PRESET_VER = 'mixultra-v3'; // v2: LOOP モードのパッド5・6 に ±3秒を追加 / v3: SHIFT＋CUE＝SET、SHIFT＋PLAY＝↶
 function mixUltraPreset() {
   const m = {};
   m['n:1:4'] = { t: 'shift' }; m['n:2:4'] = { t: 'shift' };
@@ -1296,6 +1305,8 @@ function mixUltraPreset() {
     m[`n:${ch}:7`] = { t: `${d}.play` };
     m[`n:${ch}:6`] = { t: `${d}.cue` };
     m[`n:${ch}:13`] = { t: `${d}.load` };
+    m[`n:${shiftCh}:6`] = { t: `${d}.cueSet` };  // SHIFT＋CUE（SHIFT 中は別チャンネルで送る場合）
+    m[`n:${shiftCh}:7`] = { t: `${d}.cueJump` }; // SHIFT＋PLAY
     m[`c:${ch}:0`] = { t: `${d}.volume` };
     m[`c:${ch}:8`] = { t: `${d}.pitch` };
     m[`c:${ch}:10`] = { t: `${d}.jog`, rel: 'twos' };    // ジョグ天面
@@ -1353,6 +1364,9 @@ function dispatch(b, val) {
   if (t.kind === 'button') {
     const pressed = val > 0;
     if (act === 'shift') { shiftHeld = pressed; return; }
+    // SHIFT＋CUE ＝ SET、SHIFT＋PLAY ＝ ↶（SHIFT 中も同じ信号を送る機種向け）
+    if (shiftHeld && act === 'cue') { if (pressed) deck.button('cueSet', true); return; }
+    if (shiftHeld && act === 'play') { if (pressed) deck.button('cueJump', true); return; }
     if (act.startsWith('hcDel')) { if (pressed) deck.deleteHotcue(+act.slice(5) - 1); return; }
     if (act.startsWith('hc')) { if (pressed) deck.hotcue(+act.slice(2) - 1); return; }
     deck.button(act, pressed);
