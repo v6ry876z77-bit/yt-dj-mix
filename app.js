@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-24c';
+const APP_VERSION = '2026-11-24d';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -41,14 +41,6 @@ for (const d of DECK_NAMES) {
 }
 addT('browse', 'ブラウズつまみ（履歴の選択）', 'rel', 'ブラウズつまみを回してください');
 
-// ウィザードの手順（ジョグは天面と側面で2回）
-const WIZARD = [];
-for (const t of TARGETS) {
-  if (/\.hcDel\d$/.test(t.id)) continue; // 削除用は一覧からだけ割り当てる
-  WIZARD.push(t.id);
-  if (t.kind === 'rel' && t.id.endsWith('.jog')) WIZARD.push(t.id + '#2');
-}
-
 /* ---------- 保存状態 ---------- */
 const defaults = () => ({
   map: {},               // "c:0:48" -> {t:"A.jog", rel:"twos"|"offset"}
@@ -58,6 +50,7 @@ const defaults = () => ({
   xf: 0.5, vol: { A: 1, B: 1 },
   channels: [],          // お気に入りチャンネル [{id:'UC…', name, seen: 最後に見た最新動画ID}]
   cloudLinks: [],        // クラウドへのリンク [{name, url}]
+  hwKeys: {},            // 割り当て図で「操作して覚える」をした部品の信号 { 部品/行: 'n:1:6' }
   cues: {},              // 曲ごとのホットキュー等 { 動画ID または file:名前:大きさ: {cue, hc:[8], li, lo, t} }
 });
 let S = defaults();
@@ -1324,7 +1317,7 @@ function mixUltraPreset() {
 }
 function applyMixUltraPreset(silent) {
   if (Object.keys(S.map).length && !S.mapPreset) S.mapBackup = S.map; // 自分で学習した割り当ては念のため残す（専用割り当ての版上げでは上書きしない）
-  S.map = mixUltraPreset(); S.mapPreset = MIXULTRA_PRESET_VER; S.settings.pitchInvert = false;
+  S.map = mixUltraPreset(); S.hwKeys = {}; S.mapPreset = MIXULTRA_PRESET_VER; S.settings.pitchInvert = false;
   save(); refreshLeds();
   if (!silent) toast('Mix Ultra 用の割り当てを読み込みました（学習の操作は不要です）', 3500);
 }
@@ -1349,12 +1342,15 @@ function onMidi(e) {
   else if (type === 0xB0) { key = `c:${ch}:${d1}`; val = d2; }
   else if (type === 0xE0) { key = `p:${ch}`; val = ((d2 << 7) | d1) / 16383 * 127; }
   else return;
-  const b = S.map[key];
+  if (diag.learn && hwLearnFeed(key, val)) return; // 割り当て図の「操作して覚える」
+  let b = S.map[key];
+  const red = shiftRedirect(key); if (red !== undefined) b = red;
   monitorLines.unshift(`${keyLabel(key)}  値=${Math.round(val)}${b ? '  → ' + TMAP[b.t]?.label : ''}`);
   if (monitorLines.length > 12) monitorLines.length = 12;
   if ($('#settings').open) $('#monitor').textContent = monitorLines.join('\n');
   if (learn) { learnFeed(key, val); return; }
   if (b) dispatch(b, val);
+  hwHit(key, val);
 }
 function dispatch(b, val) {
   const t = TMAP[b.t]; if (!t) return;
@@ -1363,9 +1359,6 @@ function dispatch(b, val) {
   if (t.kind === 'button') {
     const pressed = val > 0;
     if (act === 'shift') { shiftHeld = pressed; return; }
-    // SHIFT＋CUE ＝ SET、SHIFT＋PLAY ＝ ↶（SHIFT 中も同じ信号を送る機種向け）
-    if (shiftHeld && act === 'cue') { if (pressed) deck.button('cueSet', true); return; }
-    if (shiftHeld && act === 'play') { if (pressed) deck.button('cueJump', true); return; }
     if (act.startsWith('hcDel')) { if (pressed) deck.deleteHotcue(+act.slice(5) - 1); return; }
     if (act.startsWith('hc')) { if (pressed) deck.hotcue(+act.slice(2) - 1); return; }
     deck.button(act, pressed);
@@ -1451,7 +1444,7 @@ function finishLearn(key, rel) {
 function renderMapTable() {
   const rows = TARGETS.map(t => {
     const keys = Object.entries(S.map).filter(([, b]) => b.t === t.id).map(([k]) => keyLabel(k));
-    const learning = learn && !wiz && learn.target === t.id;
+    const learning = learn && learn.target === t.id;
     return `<tr data-t="${t.id}" class="${learning ? 'learning' : ''}"><td>${t.label}</td><td>${learning ? '…操作してください' : (keys.join(' / ') || '未割り当て')}</td>
       <td style="white-space:nowrap"><button data-learn>学習</button> <button data-clr>消去</button></td></tr>`;
   });
@@ -1479,11 +1472,11 @@ function openSettings() {
   $('#optKey').value = S.settings.ytKey || '';
   $('#optBMode').value = S.settings.bMode;
   $('#monitor').textContent = monitorLines.join('\n') || '（コントローラーを操作するとここに表示されます）';
-  renderMapTable(); $('#settings').showModal();
+  renderMapTable(); $('#settings').showModal(); renderHw();
 }
 $('#btnSettings').addEventListener('click', openSettings);
 $('#btnCloseSettings').addEventListener('click', () => { cancelLearn(); $('#settings').close(); });
-$('#settings').addEventListener('close', cancelLearn);
+$('#settings').addEventListener('close', () => { cancelLearn(); diag.learn = null; });
 $('#optRange').addEventListener('change', e => { S.settings.pitchRange = +e.target.value; decks.forEach(d => d.setPitch(d.pitch)); save(); });
 $('#optInvert').addEventListener('change', e => { S.settings.pitchInvert = e.target.checked; save(); });
 $('#optJog').addEventListener('change', e => { const v = +e.target.value; if (v > 0) { S.settings.jogSens = v; save(); } });
@@ -1509,39 +1502,179 @@ $('#fileImport').addEventListener('change', async e => {
   e.target.value = '';
 });
 
-/* ---------- かんたん割り当て（ウィザード） ---------- */
-let wiz = null; // {i}
-function wizShow() {
-  const step = WIZARD[wiz.i];
-  if (!step) { wizEnd(true); return; }
-  const tid = step.split('#')[0], t = TMAP[tid], second = step.includes('#2');
-  $('#wizCount').textContent = `${wiz.i + 1} / ${WIZARD.length}`;
-  $('#wizStep').textContent = t.label + (second ? '（2回目：ジョグの側面）' : '');
-  $('#wizHow').textContent = second ? 'ジョグの外側（側面）を回してください。天面と同じ信号なら自動で次へ進みます。無ければスキップ。' : (t.how || HOW[t.kind]);
-  $('#wizInfo').textContent = '';
-  startLearn(step, (key, already) => {
-    $('#wizInfo').textContent = already && second ? '天面と同じ信号でした → 次へ' : `✓ ${keyLabel(key)} を登録しました`;
-    setTimeout(() => { if (wiz) { wiz.i++; wizShow(); } }, 650);
-  });
-}
-function wizEnd(finished) {
-  cancelLearn(); wiz = null; $('#wizard').close();
-  if (finished) toast('割り当てが完了しました！', 3000);
-  if ($('#settings').open) renderMapTable();
-}
 $('#btnMixUltra').addEventListener('click', () => {
-  if (confirm('Mix Ultra の標準の割り当てに戻しますか？（自分で学習した割り当ては置き換わります）')) { applyMixUltraPreset(); renderMapTable(); }
+  if (confirm('Mix Ultra の標準の割り当てに戻しますか？（自分で変えた割り当ては置き換わります）')) { applyMixUltraPreset(); renderMapTable(); renderHw(); }
 });
-$('#btnWizard').addEventListener('click', () => {
-  if (!midi || ![...midi.inputs.values()].some(i => i.state === 'connected')) { toast('先にコントローラーを接続してください'); return; }
-  if (Object.keys(S.map).length && !confirm('今の割り当てを消去して最初から設定し直します。よろしいですか？')) return;
-  S.map = {}; save();
-  wiz = { i: 0 }; $('#wizard').showModal(); wizShow();
+/* ---------- 割り当て図（Mix Ultra の並びを描いた図。写真は使わず自前で描く） ----------
+   図の部品（パーツ）ごとに「層」（通常／SHIFT／パッドのモード）と MIDI 信号を持つ。
+   信号は 2026-11-08 に実機で採取したもの。guess: true は未採取で、Hercules の並び方からの推定。 */
+const PADMODES = [['hc', 'HOT CUE', 0], ['lp', 'LOOP', 16], ['fx', 'FX', 32], ['nm', 'NEURAL MIX', 48]];
+const HW = (() => {
+  const P = [];
+  const add = (o) => { o.rows = o.rows || []; o.rows.forEach(r => { r.rid = `${o.id}/${r.id}`; r.part = o; }); P.push(o); };
+  for (const [d, ch, padCh, sh, L] of [['A', 1, 6, 4, true], ['B', 2, 7, 5, false]]) {
+    const G = L ? { tempo: 15, jog: 95, btn: 20, pad: 100 } : { tempo: 937, jog: 675, btn: 655, pad: 735 };
+    add({ id: `${d}tempo`, deck: d, name: 'テンポ', x: G.tempo, y: 40, w: 50, h: 230, shape: 'fader',
+      rows: [{ id: 'f', layer: 'n', label: '動かす', key: `c:${ch}:8`, kind: 'abs' }] });
+    add({ id: `${d}jog`, deck: d, name: 'ジョグ', x: G.jog, y: 35, w: 240, h: 240, shape: 'jog', rows: [
+      { id: 'top', layer: 'n', label: '天面を回す', key: `c:${ch}:10`, kind: 'rel' },
+      { id: 'side', layer: 'n', label: '側面を回す', key: `c:${ch}:9`, kind: 'rel' },
+      { id: 'stop', layer: 's', label: 'SHIFT を押しながら天面を回す', key: `c:${sh}:10`, kind: 'rel' }] });
+    add({ id: `${d}shift`, deck: d, name: 'SHIFT', x: G.btn, y: 318, w: 62, h: 34, shape: 'btn', fixed: true,
+      rows: [{ id: 'n', layer: 'n', label: '押す', key: `n:${ch}:4`, kind: 'button' }] });
+    for (const [id, name, y, h, note, guessS] of [['sync', 'SYNC', 360, 34, 5, true], ['cue', 'CUE', 402, 42, 6, true], ['play', '▶/❚❚', 452, 50, 7, true]]) {
+      add({ id: `${d}${id}`, deck: d, name, x: G.btn, y, w: 62, h, shape: 'btn', rows: [
+        { id: 'n', layer: 'n', label: '押す', key: `n:${ch}:${note}`, kind: 'button' },
+        { id: 's', layer: 's', label: 'SHIFT を押しながら', key: `n:${sh}:${note}`, kind: 'button', guess: guessS }] });
+    }
+    PADMODES.forEach(([m, name], i) => add({ id: `${d}mode${m}`, deck: d, name, x: G.pad + i * 65, y: 318, w: 58, h: 26, shape: 'mode', mode: m }));
+    for (let i = 0; i < 8; i++) {
+      const rows = [];
+      for (const [m, mname, base] of PADMODES) {
+        rows.push({ id: m, layer: m, label: `${mname} モード`, key: `n:${padCh}:${base + i}`, kind: 'button', guess: m !== 'hc' && m !== 'lp' });
+        rows.push({ id: m + 'S', layer: m + 'S', label: `${mname} モードで SHIFT を押しながら`, key: `n:${padCh}:${base + 8 + i}`, kind: 'button', guess: m !== 'hc' });
+      }
+      add({ id: `${d}pad${i + 1}`, deck: d, name: `パッド${i + 1}`, x: G.pad + (i % 4) * 65, y: 352 + Math.floor(i / 4) * 78, w: 58, h: 72, shape: 'pad', rows });
+    }
+    add({ id: `${d}vol`, deck: d, name: '音量', x: L ? 380 : 580, y: 318, w: 40, h: 170, shape: 'fader',
+      rows: [{ id: 'f', layer: 'n', label: '動かす', key: `c:${ch}:0`, kind: 'abs' }] });
+    add({ id: `${d}load`, deck: d, name: L ? '1' : '2', x: L ? 418 : 532, y: 14, w: 50, h: 30, shape: 'btn', rows: [
+      { id: 'n', layer: 'n', label: '押す', key: `n:${ch}:13`, kind: 'button' },
+      { id: 's', layer: 's', label: 'SHIFT を押しながら', key: `n:${sh}:13`, kind: 'button', guess: true }] });
+    const kx = L ? 372 : 588;
+    add({ id: `${d}high`, deck: d, name: 'HIGH', x: kx, y: 58, w: 40, h: 40, shape: 'knob', unused: true });
+    add({ id: `${d}mid`, deck: d, name: 'MID', x: kx, y: 118, w: 40, h: 40, shape: 'knob', unused: true });
+    add({ id: `${d}low`, deck: d, name: 'LOW', x: kx, y: 178, w: 40, h: 40, shape: 'knob', unused: true });
+    add({ id: `${d}filter`, deck: d, name: 'FILTER', x: kx, y: 248, w: 40, h: 40, shape: 'knob', unused: true });
+    add({ id: `${d}phones`, deck: d, name: '🎧', x: L ? 440 : 526, y: 254, w: 34, h: 30, shape: 'btn', unused: true });
+  }
+  add({ id: 'browse', name: 'ブラウズ', x: 470, y: 50, w: 60, h: 60, shape: 'knob', rows: [
+    { id: 'turn', layer: 'n', label: '回す', key: 'c:0:1', kind: 'rel' },
+    { id: 'push', layer: 'n', label: '押し込む', key: 'n:0:0', kind: 'button' }] });
+  add({ id: 'neural', name: 'NEURAL MIX', x: 462, y: 128, w: 76, h: 44, shape: 'knob', unused: true });
+  add({ id: 'master', name: 'MASTER', x: 475, y: 188, w: 50, h: 44, shape: 'knob', unused: true });
+  add({ id: 'xfader', name: 'クロスフェーダー', x: 430, y: 455, w: 140, h: 44, shape: 'fader',
+    rows: [{ id: 'f', layer: 'n', label: '動かす', key: 'c:0:0', kind: 'abs' }] });
+  return P;
+})();
+const HWROWS = HW.flatMap(p => p.rows);
+const hwKey = r => (S.hwKeys && S.hwKeys[r.rid]) || r.key;
+const diag = { shift: false, mode: { A: 'hc', B: 'hc' }, sel: null, learn: null };
+
+// 機能の短い名前（図の中に書く用）
+const SHORT = { play: '再生', cue: 'CUE', cueSet: 'SET', cueJump: '↶', volume: '音量', pitch: 'テンポ', jog: 'ジョグ', jogFast: '速送り',
+  loopIn: 'ループIN', loopOut: 'ループOUT', back: '−10秒', fwd: '+10秒', back3: '−3秒', fwd3: '+3秒', load: '読込', shift: 'SHIFT', xfader: 'クロスフェーダー', browse: '曲を選ぶ' };
+function shortLabel(tid, deck) {
+  const t = TMAP[tid]; if (!t) return '—';
+  const [dn, act] = tid.includes('.') ? tid.split('.') : [null, tid];
+  let s = SHORT[act] || (act.startsWith('hcDel') ? `キュー${act.slice(5)}消去` : act.startsWith('hc') ? `キュー${act.slice(2)}` : t.label);
+  if (dn && dn !== deck) s = `${dn}:${s}`; // 反対側のデッキを動かす割り当ては頭に A: / B: を付ける
+  return s;
+}
+// 図で今見せる層の行
+function viewRow(p) {
+  if (p.shape === 'pad') return p.rows.find(r => r.layer === diag.mode[p.deck] + (diag.shift ? 'S' : ''));
+  return p.rows.find(r => r.layer === (diag.shift ? 's' : 'n')) || p.rows.find(r => r.layer === 'n');
+}
+function renderHw() {
+  if (!$('#settings').open) return;
+  $$('#hwShift button').forEach(b => b.classList.toggle('on', (b.dataset.v === 's') === diag.shift));
+  const parts = HW.map(p => {
+    const r = viewRow(p);
+    const b = r && S.map[hwKey(r)];
+    let fn = '';
+    if (p.unused) fn = ''; // 未使用は点線・灰色で見分ける
+    else if (p.fixed) fn = 'SHIFT';
+    else if (p.shape === 'mode') fn = '';
+    else fn = b ? shortLabel(b.t, p.deck) : '—';
+    const cls = ['hwp', p.shape, p.unused ? 'unused' : '', diag.sel === p.id ? 'sel' : '', p.shape === 'mode' && diag.mode[p.deck] === p.mode ? 'on' : '', b ? '' : 'empty'].join(' ');
+    return `<button class="${cls}" data-p="${p.id}" style="left:${p.x / 10}%;top:${p.y / 5.2}%;width:${p.w / 10}%;height:${p.h / 5.2}%">` +
+      (p.shape === 'mode' || p.unused ? `<b>${p.name}</b>` : fn === p.name ? `<b>${fn}</b>` : `<span class="nm">${p.name}</span>${fn ? `<b>${fn}</b>` : ''}`) + '</button>';
+  });
+  $('#hw').innerHTML = `<div class="hwlbl" style="left:2%;top:58%">デッキA</div><div class="hwlbl" style="left:65.5%;top:58%">デッキB</div>` + parts.join('');
+  renderHwPanel();
+}
+function renderHwPanel() {
+  const el = $('#hwPanel'); const p = HW.find(x => x.id === diag.sel);
+  if (!p) { el.innerHTML = '<div class="hint">図の部品を押すと、ここで割り当てを変えられます。コントローラーを操作すると、図の同じ部品が光ります。</div>'; return; }
+  const title = `${p.deck ? `デッキ${p.deck} ` : ''}${p.name}`;
+  if (p.unused) { el.innerHTML = `<h4>${title}</h4><div class="hint">このアプリでは使いません（YouTube の音は加工できないため）。</div>`; return; }
+  if (p.fixed) { el.innerHTML = `<h4>${title}</h4><div class="hint">SHIFT ボタンです（変えられません）。押しながら他のボタンを押すと、図の「SHIFT を押しながら」の割り当てが働きます。</div>`; return; }
+  if (p.shape === 'mode') { el.innerHTML = `<h4>${title}</h4><div class="hint">パッドの種類を切り替えるボタンです（切り替えはコントローラー本体が行います）。図のパッドの表示を ${p.name} モードに切り替えました。</div>`; return; }
+  const rows = p.rows.map(r => {
+    const key = hwKey(r), b = S.map[key];
+    const opts = ['<option value="">（なし）</option>'];
+    for (const [g, pre] of [['共通', null], ['デッキA', 'A.'], ['デッキB', 'B.']]) {
+      const ts = TARGETS.filter(t => t.kind === r.kind && (pre ? t.id.startsWith(pre) : !t.id.includes('.')));
+      if (ts.length) opts.push(`<optgroup label="${g}">` + ts.map(t => `<option value="${t.id}"${b && b.t === t.id ? ' selected' : ''}>${t.label}</option>`).join('') + '</optgroup>');
+    }
+    const learning = diag.learn === r.rid;
+    return `<div class="hwrow${learning ? ' learning' : ''}" data-r="${r.rid}"><span class="ly">${r.label}${r.guess && !(S.hwKeys && S.hwKeys[r.rid]) ? ' <span class="hint">（信号は推定）</span>' : ''}</span>
+      <select>${opts.join('')}</select>
+      <button data-hwlearn>${learning ? '…コントローラーで操作してください（やめる）' : 'コントローラーで操作して覚える'}</button></div>`;
+  });
+  el.innerHTML = `<h4>${title}</h4>${rows.join('')}<div class="hint">「（信号は推定）」の行は、まだ実機で確かめていません。選んでも効かないときは「コントローラーで操作して覚える」を押してから、その操作をしてください。</div>`;
+}
+$('#hw').addEventListener('click', e => {
+  const b = e.target.closest('[data-p]'); if (!b) return;
+  const p = HW.find(x => x.id === b.dataset.p);
+  if (p.shape === 'mode') diag.mode[p.deck] = p.mode;
+  diag.sel = p.id; diag.learn = null; renderHw();
 });
-$('#wizSkip').addEventListener('click', () => { wiz.i++; wizShow(); });
-$('#wizBack').addEventListener('click', () => { wiz.i = Math.max(0, wiz.i - 1); wizShow(); });
-$('#wizStop').addEventListener('click', () => wizEnd(false));
-$('#wizard').addEventListener('cancel', () => wizEnd(false));
+$('#hwShift').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; diag.shift = b.dataset.v === 's'; renderHw(); });
+$('#hwPanel').addEventListener('change', e => {
+  const row = HWROWS.find(r => r.rid === e.target.closest('[data-r]').dataset.r); const key = hwKey(row), v = e.target.value;
+  if (!v) delete S.map[key];
+  else S.map[key] = row.kind === 'rel' ? { t: v, rel: (S.map[key] && S.map[key].rel) || 'twos' } : { t: v };
+  save(); refreshLeds(); renderHw();
+});
+$('#hwPanel').addEventListener('click', e => {
+  if (!e.target.hasAttribute('data-hwlearn')) return;
+  const rid = e.target.closest('[data-r]').dataset.r;
+  diag.learn = diag.learn === rid ? null : rid; renderHwPanel();
+});
+// 「操作して覚える」: 次に来た信号をその行の信号にする（割り当て済みの機能は新しい信号へ移す）
+function hwLearnFeed(key, val) {
+  const row = HWROWS.find(r => r.rid === diag.learn); if (!row) { diag.learn = null; return false; }
+  if (row.kind === 'button') { if (key[0] !== 'n' || val <= 0) return true; }
+  else { if (key[0] !== 'c') return true; const n = +key.split(':')[2]; if (n >= 32 && n < 64) return true; } // 14bit の下位側は無視
+  const old = hwKey(row);
+  if (old !== key) {
+    if (S.map[old]) { S.map[key] = S.map[old]; delete S.map[old]; }
+    (S.hwKeys ||= {})[row.rid] = key;
+  }
+  diag.learn = null; save(); refreshLeds(); renderHw();
+  toast(`${row.part.deck ? 'デッキ' + row.part.deck + ' ' : ''}${row.part.name}（${row.label}）の信号を覚えました`, 2500);
+  return true;
+}
+// SHIFT を押していても通常と同じ信号を送るボタンのために、SHIFT 中は「SHIFT を押しながら」の割り当てを使う
+function shiftRedirect(key) {
+  if (!shiftHeld) return undefined;
+  const r = HWROWS.find(x => x.layer === 'n' && x.kind === 'button' && hwKey(x) === key);
+  const s = r && r.part.rows.find(x => x.layer === 's');
+  return s ? (S.map[hwKey(s)] || null) : undefined;
+}
+// 受け取った信号を図に反映（どの部品か光らせる。パッドのモードや SHIFT の状態も図に合わせる）
+let hwFlashT = {};
+function hwHit(key, val) {
+  const n = key.split(':');
+  if (key[0] === 'n' && val > 0) { // モード切り替えボタン（本体が切り替える）を追いかける
+    const mi = +n[2] - 15, dk = n[1] === '1' ? 'A' : n[1] === '2' ? 'B' : null;
+    if (dk && mi >= 0 && mi < 4 && diag.mode[dk] !== PADMODES[mi][0]) { diag.mode[dk] = PADMODES[mi][0]; renderHw(); }
+  }
+  if (!$('#settings').open) return;
+  let row = HWROWS.find(r => hwKey(r) === key);
+  if (!row) return;
+  if (row.part.fixed) { diag.shift = val > 0; renderHw(); }
+  if (row.layer === 'n' && shiftHeld) row = row.part.rows.find(x => x.layer === 's') || row;
+  const p = row.part;
+  if (p.shape === 'pad') { const m = row.layer.replace('S', ''); if (diag.mode[p.deck] !== m || diag.shift !== row.layer.endsWith('S')) { diag.mode[p.deck] = m; diag.shift = row.layer.endsWith('S'); renderHw(); } }
+  else if (row.kind === 'button' && val > 0 && !p.fixed && diag.shift !== (row.layer === 's')) { diag.shift = row.layer === 's'; renderHw(); }
+  if (row.kind === 'button' && val <= 0) return;
+  const el = $(`#hw [data-p="${p.id}"]`); if (el) { el.classList.add('hit'); clearTimeout(hwFlashT[p.id]); hwFlashT[p.id] = setTimeout(() => el.classList.remove('hit'), 300); }
+  const b = S.map[hwKey(row)];
+  $('#hwNow').textContent = `今の操作: ${p.deck ? 'デッキ' + p.deck + ' ' : ''}${p.name}（${row.label}）→ ${b ? TMAP[b.t]?.label : '割り当てなし'}`;
+}
 
 /* ---------- 開始・画面 ---------- */
 let wakeLock = null;

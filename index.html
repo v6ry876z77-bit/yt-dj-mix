@@ -123,7 +123,7 @@ body.bhide .hist li button[data-to=B]{display:none}
 .seg .badge{display:inline-block;min-width:1.5em;margin-left:4px;padding:0 5px;border-radius:9px;background:var(--ok);color:#000;font-size:11px;font-weight:800;line-height:1.5}
 .seg>button.on{color:var(--text);border-bottom-color:var(--a);font-weight:700}
 .hint{color:var(--dim);font-size:12px}
-dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:0;width:min(900px,calc(100vw - 32px));max-height:calc(100vh - 32px)}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:0;width:min(1150px,calc(100vw - 24px));max-height:calc(100vh - 32px)}
 dialog::backdrop{background:rgba(0,0,0,.7)}
 .dlg{padding:16px;display:flex;flex-direction:column;gap:12px}
 .dlg h3{margin:4px 0}
@@ -135,8 +135,42 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
 pre{background:#000;border-radius:8px;padding:8px;font-size:12px;max-height:160px;overflow-y:auto;white-space:pre-wrap;margin:0}
 .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
 .opts label{display:flex;gap:8px;align-items:center}
-#wizStep{font-size:22px;font-weight:800}
-#wizInfo{min-height:1.4em;color:var(--ok)}
+/* 割り当て図（Mix Ultra の並び） */
+#hwShift{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#hwShift button{padding:6px 14px}
+#hwShift button.on{background:var(--a);color:#000;font-weight:800}
+#hw{position:relative;width:100%;aspect-ratio:1000/520;background:#e9e9e6;border-radius:14px;border:2px solid #999;font-size:clamp(8px,1.05vw,13px);color:#111}
+#hw .hwlbl{position:absolute;font-weight:800;color:#333;font-size:1.1em}
+.hwp{position:absolute;padding:1px;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;line-height:1.15;
+  background:#fff;color:#111;border:2px solid #333;border-radius:6px;font-size:1em;overflow:hidden;text-align:center;word-break:keep-all}
+.hwp b,.hwp .nm{white-space:nowrap}
+.hwp.knob b{font-size:.75em}
+.hwp.knob b,.hwp.mode b{white-space:normal}
+.hwp.pad b{font-size:.9em;letter-spacing:-.02em}
+.hwp .nm{font-size:.85em;color:#555}
+.hwp b{font-size:1em;color:#000}
+.hwp.empty b{color:#999;font-weight:400}
+.hwp.jog{border-radius:50%;background:#2a2a2a;border-color:#111}
+.hwp.jog .nm,.hwp.jog b{color:#fff}
+.hwp.knob{border-radius:50%}
+.hwp.pad{background:#bfe3ff;border-color:#246}
+.hwp.fader{background:#f4f4f4}
+.hwp.mode{background:#333;color:#fff;border-color:#333;font-size:.85em}
+.hwp.mode b{color:#fff}
+.hwp.mode.on{background:#0a7;border-color:#064}
+.hwp.unused{background:#d6d6d2;border-color:#aaa;border-style:dashed}
+.hwp.unused .nm,.hwp.unused b{color:#888}
+.hwp.sel{outline:4px solid #e60;outline-offset:1px;z-index:2}
+.hwp.hit{background:#ffd400 !important;border-color:#a60 !important;z-index:3}
+.hwp.hit .nm,.hwp.hit b{color:#000 !important}
+#hwNow{min-height:1.4em;font-weight:700;color:var(--ok)}
+#hwPanel{border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+#hwPanel h4{margin:0 0 4px;font-size:16px}
+.hwrow{display:grid;grid-template-columns:minmax(140px,1.2fr) minmax(160px,1.5fr) auto;gap:8px;align-items:center}
+.hwrow.learning{background:#4a3d10;border-radius:6px}
+.hwrow select{min-width:0;padding:5px;font-size:14px}
+.hwrow button{padding:5px 8px;font-size:13px}
+@media (max-width:700px){.hwrow{grid-template-columns:1fr}}
 #clipBar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--panel);border:2px solid var(--ok);padding:10px 12px;border-radius:12px;z-index:55;display:none;width:min(560px,calc(100vw - 32px));box-shadow:0 6px 24px rgba(0,0,0,.6)}
 #clipBar .ct{font-weight:600;margin-bottom:8px}
 #clipBar .row>button{min-width:64px}
@@ -235,9 +269,13 @@ body.bhide .frow button[data-to=B]{display:none}
     <div>
       <div><b>MIDI:</b> <span id="midiList">-</span></div>
       <div class="row" style="margin-top:6px"><button id="btnMixUltra">Mix Ultra の標準割り当てに戻す</button><button id="btnReconnect">MIDI 再接続</button></div>
-      <div class="hint" style="margin-top:6px">Mix Ultra をつなぐと、専用の割り当てが自動で入ります（学習は不要）。下の学習機能は、割り当てを変えたいときだけ使ってください。</div>
-      <div class="row" style="margin-top:6px"><button id="btnWizard">かんたん割り当て（順番に操作するだけ）</button></div>
+      <div class="hint" style="margin-top:6px">Mix Ultra をつなぐと、専用の割り当てが自動で入ります。変えたいときは、下の図の部品を押して機能を選んでください。</div>
     </div>
+    <h3>コントローラーの割り当て（DJControl Mix Ultra）</h3>
+    <div id="hwShift"><span>表示:</span><button data-v="n">通常</button><button data-v="s">SHIFT を押しながら</button><span class="hint">パッドはモードのボタン（HOT CUE など）を押すと表示が切り替わります</span></div>
+    <div id="hw"></div>
+    <div id="hwNow"></div>
+    <div id="hwPanel"></div>
     <div class="opts">
       <label>ピッチ幅 <select id="optRange"><option value="0.25">±25%</option><option value="0.5">±50%</option><option value="1">±100%</option></select></label>
       <span class="hint" style="grid-column:1/-1">※ YouTube の埋め込み再生はテンポを 0.25 刻み（0.75 / 1.00 / 1.25 倍…）でしか変えられません。細かいピッチ合わせはできません。</span>
@@ -249,6 +287,7 @@ body.bhide .frow button[data-to=B]{display:none}
       <label style="grid-column:1/-1">YouTube API キー（検索用） <input id="optKey" type="password" autocomplete="off" spellcheck="false" style="flex:1" placeholder="AIza…"></label>
       <span class="hint" style="grid-column:1/-1">キーはこの端末の中だけに保存されます。1日あたり約100回まで検索できます。</span>
     </div>
+    <details><summary>詳しい情報（信号の一覧・モニター・書き出し）</summary>
     <h3>MIDI モニター（最後に受信した信号）</h3>
     <pre id="monitor">（コントローラーを操作するとここに表示されます）</pre>
     <h3>割り当て一覧</h3>
@@ -260,23 +299,15 @@ body.bhide .frow button[data-to=B]{display:none}
       <button id="btnClearMap">割り当てを全消去</button>
       <input type="file" id="fileImport" accept=".json,application/json" hidden>
     </div>
+    </details>
   </div>
 </dialog>
 
-<dialog id="wizard">
-  <div class="dlg">
-    <div class="hint" id="wizCount"></div>
-    <div id="wizStep"></div>
-    <div id="wizHow"></div>
-    <div id="wizInfo"></div>
-    <div class="row"><button id="wizBack">← 戻る</button><button id="wizSkip">この項目は無い／スキップ</button><button id="wizStop">終了</button></div>
-  </div>
-</dialog>
 
 <div id="clipBar"><div class="hint">コピーした動画</div><div class="ct"></div>
   <div class="row"><button data-clip="A">A へ</button><button data-clip="B">B へ</button><button data-clip="hist">履歴へ</button><button data-clip="no">閉じる</button></div></div>
 <div id="toast"></div>
-<script src="app.js?v=2026-11-24c"></script>
+<script src="app.js?v=2026-11-24d"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
