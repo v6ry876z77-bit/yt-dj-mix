@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-24f';
+const APP_VERSION = '2026-11-24g';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -1344,14 +1344,26 @@ function onMidi(e) {
   else return;
   if (diag.learn && hwLearnFeed(key, val)) return; // 割り当て図の「操作して覚える」
   let b = S.map[key];
-  const red = shiftRedirect(key); if (red !== undefined) b = red;
-  monitorLines.unshift(`${keyLabel(key)}  値=${Math.round(val)}${b ? '  → ' + TMAP[b.t]?.label : ''}`);
-  if (monitorLines.length > 12) monitorLines.length = 12;
+  const isBtn = key[0] === 'n' && b && TMAP[b.t]?.kind === 'button';
+  if (isBtn && val <= 0 && key in pressedB) { b = pressedB[key]; delete pressedB[key]; } // 離したときは、押したときと同じ機能へ送る
+  else { const red = shiftRedirect(key); if (red !== undefined) b = red; if (isBtn && val > 0) pressedB[key] = b; }
+  monitorLines.unshift(`${keyLabel(key)}  値=${Math.round(val)}${shiftHeld ? '  [SHIFT中]' : ''}${b ? '  → ' + TMAP[b.t]?.label : '  → 割り当てなし'}`);
+  if (monitorLines.length > 16) monitorLines.length = 16;
   if ($('#settings').open) $('#monitor').textContent = monitorLines.join('\n');
   if (learn) { learnFeed(key, val); return; }
   if (b) dispatch(b, val);
   hwHit(key, val);
+  // 押した結果（再生中か止まっているか）を少し後にモニターへ書く（不具合の調査用）
+  if (b && key[0] === 'n' && val > 0 && b.t.includes('.')) {
+    const d = deckOf(b.t.split('.')[0]);
+    setTimeout(() => {
+      monitorLines.unshift(`   結果: デッキ${d.name} ${d.playing ? '再生中' : '停止中'}${d.cuePreview ? '（CUE 試し聴き中）' : ''}${d.playLatch ? '（PLAY 保持）' : ''}`);
+      if (monitorLines.length > 16) monitorLines.length = 16;
+      if ($('#settings').open) $('#monitor').textContent = monitorLines.join('\n');
+    }, 700);
+  }
 }
+const pressedB = {}; // 押したときに使った割り当て（SHIFT を先に離しても、離す信号は同じ機能へ届ける）
 function dispatch(b, val) {
   const t = TMAP[b.t]; if (!t) return;
   const [dn, act] = b.t.includes('.') ? b.t.split('.') : [null, b.t];
