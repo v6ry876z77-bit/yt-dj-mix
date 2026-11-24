@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-24b';
+const APP_VERSION = '2026-11-24c';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -217,14 +217,14 @@ class Deck {
         <button data-a="back">−10秒</button><button data-a="back3">−3秒</button><button data-a="fwd3">+3秒</button><button data-a="fwd">+10秒</button>
       </div>
       <div class="pads">${Array.from({ length: NCUES }, (_, i) => `<button data-hc="${i}">${i + 1}</button>`).join('')}</div>
-      <div class="lc"><div class="row loops"><button data-a="loopIn">ループ IN</button><button data-a="loopOut">ループ OUT／解除</button></div>
+      <div class="lc">
       <div class="row cc"><button data-a="cc">字幕</button><button data-a="ccMinus">字幕 小さく</button><button data-a="ccPlus">字幕 大きく</button></div></div>
       <div class="hint">パッド: 空なら登録／登録済みなら飛ぶ。長押し（またはSHIFT+パッド）で消去。</div>`;
     this.ui = {
       bar: $('.bar', this.el), fill: $('.fill', this.el), ph: $('.ph', this.el),
       marks: $('.marks', this.el), loopz: $('.loopz', this.el), cur: $('.cur', this.el), dur: $('.dur', this.el),
       remain: $('.remain', this.el), snd: $('.snd', this.el), pit: $('.pit', this.el), pv: $('.pv', this.el),
-      play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el), loopOut: $('[data-a=loopOut]', this.el),
+      play: $('[data-a=play]', this.el), cue: $('[data-a=cue]', this.el),
       pads: $$('[data-hc]', this.el), vid: $('.vid', this.el), ccBtn: $('[data-a=cc]', this.el), fvid: $('.fvid', this.el),
     };
     // ボタン（CUE は押している間だけプレビューするので pointerdown/up を使う）
@@ -595,7 +595,6 @@ class Deck {
       lz.style.width = `${Math.max(0.3, (end - this.loop.in) / this.dur * 100)}%`;
       lz.style.opacity = this.loop.on ? '1' : '.4';
     } else lz.style.display = 'none';
-    this.ui.loopOut.classList.toggle('on', this.loop.on);
     this.lastDurRendered = this.dur;
   }
   renderLive() {
