@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-24d';
+const APP_VERSION = '2026-11-24e';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -1546,7 +1546,9 @@ const HW = (() => {
     add({ id: `${d}mid`, deck: d, name: 'MID', x: kx, y: 118, w: 40, h: 40, shape: 'knob', unused: true });
     add({ id: `${d}low`, deck: d, name: 'LOW', x: kx, y: 178, w: 40, h: 40, shape: 'knob', unused: true });
     add({ id: `${d}filter`, deck: d, name: 'FILTER', x: kx, y: 248, w: 40, h: 40, shape: 'knob', unused: true });
-    add({ id: `${d}phones`, deck: d, name: '🎧', x: L ? 440 : 526, y: 254, w: 34, h: 30, shape: 'btn', unused: true });
+    add({ id: `${d}phones`, deck: d, name: '🎧', x: L ? 432 : 524, y: 250, w: 44, h: 38, shape: 'btn', rows: [ // ヘッドホン（CUE）ボタン。信号は Hercules の並びからの推定（LOAD #13 の隣の #12）
+      { id: 'n', layer: 'n', label: '押す', key: `n:${ch}:12`, kind: 'button', guess: true },
+      { id: 's', layer: 's', label: 'SHIFT を押しながら', key: `n:${sh}:12`, kind: 'button', guess: true }] });
   }
   add({ id: 'browse', name: 'ブラウズ', x: 470, y: 50, w: 60, h: 60, shape: 'knob', rows: [
     { id: 'turn', layer: 'n', label: '回す', key: 'c:0:1', kind: 'rel' },
