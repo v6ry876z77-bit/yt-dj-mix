@@ -4,7 +4,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'ytdj.v1';
-const APP_VERSION = '2026-11-24e';
+const APP_VERSION = '2026-11-24f';
 const NCUES = 8;
 const DECK_NAMES = ['A', 'B'];
 
@@ -1640,6 +1640,19 @@ function hwLearnFeed(key, val) {
   const row = HWROWS.find(r => r.rid === diag.learn); if (!row) { diag.learn = null; return false; }
   if (row.kind === 'button') { if (key[0] !== 'n' || val <= 0) return true; }
   else { if (key[0] !== 'c') return true; const n = +key.split(':')[2]; if (n >= 32 && n < 64) return true; } // 14bit の下位側は無視
+  // SHIFT ボタンそのものは覚えない（SHIFT を押しながらの操作を覚えるとき、先に届く SHIFT の信号を拾わないように）
+  if (S.map[key] && S.map[key].t === 'shift') return false;
+  const rowName = r => `${r.part.deck ? 'デッキ' + r.part.deck + ' ' : ''}${r.part.name}（${r.label}）`;
+  // SHIFT を押しながらでも普通と同じ信号を送るボタン: 信号は変えず、SHIFT 中の切り替え（shiftRedirect）に任せる
+  const nRow = row.layer === 's' && row.part.rows.find(x => x.layer === 'n' && x.kind === 'button');
+  if (nRow && hwKey(nRow) === key) {
+    diag.learn = null; renderHw();
+    toast('SHIFT を押しながらでも、普通に押したときと同じ信号でした。「SHIFT を押しながら」の割り当ては、このままで使えます', 4500);
+    return true;
+  }
+  // ほかの部品で使っている信号は覚えない（覚えると、そちらの割り当てを上書きしてしまう）
+  const other = HWROWS.find(x => x !== row && hwKey(x) === key);
+  if (other) { diag.learn = null; renderHw(); toast(`その信号は ${rowName(other)} で使っているので、覚えませんでした`, 4500); return true; }
   const old = hwKey(row);
   if (old !== key) {
     if (S.map[old]) { S.map[key] = S.map[old]; delete S.map[old]; }
@@ -1649,6 +1662,21 @@ function hwLearnFeed(key, val) {
   toast(`${row.part.deck ? 'デッキ' + row.part.deck + ' ' : ''}${row.part.name}（${row.label}）の信号を覚えました`, 2500);
   return true;
 }
+// 2026-11-24d〜e の「操作して覚える」で起きた取り違えを直す（SHIFT や PLAY の信号を別の行で覚えてしまい、
+// PLAY が ↶ に置き換わって一時停止できなくなった等）。取り違えた行の覚えた信号を捨て、標準の割り当てに戻す
+(function repairHwKeys() {
+  if (!S.hwKeys || !Object.keys(S.hwKeys).length) return;
+  const P = mixUltraPreset(); let fixed = false;
+  for (const row of HWROWS) {
+    const k = S.hwKeys[row.rid]; if (!k) continue;
+    const clash = HWROWS.some(x => x !== row && hwKey(x) === k) || (S.map[k] && S.map[k].t === 'shift') || P[k];
+    if (!clash) continue;
+    delete S.hwKeys[row.rid]; fixed = true;
+    if (P[k]) S.map[k] = P[k];                      // 上書きされた元の割り当て（PLAY・SHIFT など）を戻す
+    if (P[row.key] && !S.map[row.key]) S.map[row.key] = P[row.key]; // この行の推定の信号の割り当ても戻す
+  }
+  if (fixed) { save(); setTimeout(() => toast('コントローラーの割り当ての取り違えを直しました', 4000), 1500); }
+})();
 // SHIFT を押していても通常と同じ信号を送るボタンのために、SHIFT 中は「SHIFT を押しながら」の割り当てを使う
 function shiftRedirect(key) {
   if (!shiftHeld) return undefined;
